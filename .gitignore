@@ -29,4 +29,4 @@ bun.lockb
 # Temp/test output
 tmp/
 test-results/
-playwright-report/
+playwright-report/bun.lock
