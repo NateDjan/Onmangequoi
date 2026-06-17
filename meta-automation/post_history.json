@@ -1,0 +1,18 @@
+{
+  "pillar_index": 1,
+  "used_items": {
+    "gourmand": [
+      "('pâtes, tomates, ail, basilic, parmesan', \"Spaghetti all'arrabbiata\", 'gourmand')",
+      "('oignons, gruyère, bouillon, pain', \"Soupe à l'oignon gratinée\", 'gourmand')",
+      "('mascarpone, café, biscuits, cacao', 'Tiramisu express 20 minutes', 'gourmand')"
+    ],
+    "leger": [
+      "('tomates cerises, mozzarella, basilic, citron', 'Salade Caprese express', 'light')",
+      "('asperges, parmesan, citron, huile olive', 'Asperges rôties parmesan', 'light')",
+      "('épinards, ricotta, citron, pâtes', 'Pâtes épinards-ricotta légères', 'light')"
+    ],
+    "sport": [
+      "('poulet, patate douce, brocoli, ail', 'Bowl protéiné poulet-patate douce', 'sport')"
+    ]
+  }
+}

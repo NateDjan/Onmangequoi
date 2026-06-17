@@ -1,0 +1,354 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Custom food-themed colors */
+  --color-warm: var(--warm);
+  --color-warm-foreground: var(--warm-foreground);
+
+  /* Overlay surfaces — flip between light & dark */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-border: var(--surface-border);
+  --color-surface-border-strong: var(--surface-border-strong);
+  --color-surface-subtle: var(--surface-subtle);
+}
+
+:root {
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+  --radius: 0.75rem;
+
+  /* ── Warm Light Culinary Theme ── */
+
+  /* Warm gold accent — slightly deeper for light bg */
+  --primary: oklch(0.62 0.14 65);
+  --primary-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.62 0.14 65);
+  --sidebar-primary-foreground: oklch(1 0 0);
+
+  --success: oklch(0.55 0.18 150);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.65 0.16 75);
+  --warning-foreground: oklch(0.15 0.03 60);
+  --info: oklch(0.55 0.14 230);
+  --info-foreground: oklch(1 0 0);
+
+  /* Food chart colors */
+  --chart-1: oklch(0.55 0.16 150);
+  --chart-2: oklch(0.62 0.14 65);
+  --chart-3: oklch(0.65 0.16 85);
+  --chart-4: oklch(0.55 0.20 18);
+  --chart-5: oklch(0.55 0.14 185);
+
+  /* ── Warm cream light palette ── */
+  --background: oklch(0.975 0.005 75);
+  --foreground: oklch(0.18 0.02 40);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 40);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 40);
+
+  --secondary: oklch(0.94 0.008 70);
+  --secondary-foreground: oklch(0.30 0.02 40);
+
+  --muted: oklch(0.95 0.006 70);
+  --muted-foreground: oklch(0.46 0.02 55);
+
+  --accent: oklch(0.93 0.010 70);
+  --accent-foreground: oklch(0.18 0.02 40);
+
+  --destructive: oklch(0.55 0.24 25);
+  --destructive-foreground: oklch(1 0 0);
+
+  --border: oklch(0 0 0 / 10%);
+  --input: oklch(0 0 0 / 12%);
+  --ring: oklch(0.62 0.14 65);
+
+  --sidebar: oklch(0.97 0.005 70);
+  --sidebar-foreground: oklch(0.18 0.02 40);
+  --sidebar-accent: oklch(0.94 0.008 70);
+  --sidebar-accent-foreground: oklch(0.18 0.02 40);
+  --sidebar-border: oklch(0 0 0 / 8%);
+  --sidebar-ring: oklch(0.62 0.14 65);
+
+  --warm: oklch(0.95 0.012 55);
+  --warm-foreground: oklch(0.40 0.06 50);
+
+  /* Overlay surfaces for light */
+  --surface-hover: oklch(0 0 0 / 4%);
+  --surface-border: oklch(0 0 0 / 8%);
+  --surface-border-strong: oklch(0 0 0 / 15%);
+  --surface-subtle: oklch(0 0 0 / 3%);
+}
+
+.dark {
+  /* ── Premium Dark Culinary Theme ── */
+
+  /* True gold — the hero accent */
+  --primary: oklch(0.82 0.09 82);
+  --primary-foreground: oklch(0.10 0.015 40);
+  --sidebar-primary: oklch(0.82 0.09 82);
+  --sidebar-primary-foreground: oklch(0.10 0.015 40);
+
+  --success: oklch(0.68 0.16 150);
+  --success-foreground: oklch(0.10 0.02 150);
+  --warning: oklch(0.75 0.14 75);
+  --warning-foreground: oklch(0.12 0.03 60);
+  --info: oklch(0.68 0.12 230);
+  --info-foreground: oklch(0.10 0.02 230);
+
+  --chart-1: oklch(0.68 0.14 150);
+  --chart-2: oklch(0.82 0.09 82);
+  --chart-3: oklch(0.76 0.14 85);
+  --chart-4: oklch(0.62 0.18 18);
+  --chart-5: oklch(0.68 0.12 185);
+
+  /* ── Deep espresso dark palette ── */
+  --background: oklch(0.10 0.018 40);
+  --foreground: oklch(0.93 0.012 78);
+
+  --card: oklch(0.145 0.020 42);
+  --card-foreground: oklch(0.93 0.012 78);
+
+  --popover: oklch(0.145 0.020 42);
+  --popover-foreground: oklch(0.93 0.012 78);
+
+  --secondary: oklch(0.19 0.018 44);
+  --secondary-foreground: oklch(0.86 0.012 75);
+
+  --muted: oklch(0.17 0.016 43);
+  --muted-foreground: oklch(0.54 0.022 58);
+
+  --accent: oklch(0.20 0.020 44);
+  --accent-foreground: oklch(0.93 0.012 78);
+
+  --destructive: oklch(0.60 0.22 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 11%);
+  --ring: oklch(0.82 0.09 82);
+
+  --sidebar: oklch(0.12 0.018 40);
+  --sidebar-foreground: oklch(0.93 0.012 78);
+  --sidebar-accent: oklch(0.19 0.018 44);
+  --sidebar-accent-foreground: oklch(0.93 0.012 78);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.82 0.09 82);
+
+  --warm: oklch(0.22 0.022 48);
+  --warm-foreground: oklch(0.85 0.04 62);
+
+  /* Overlay surfaces for dark */
+  --surface-hover: oklch(1 0 0 / 5%);
+  --surface-border: oklch(1 0 0 / 8%);
+  --surface-border-strong: oklch(1 0 0 / 15%);
+  --surface-subtle: oklch(1 0 0 / 4%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Light mode: subtle warm gradient */
+  :root:not(.dark) body {
+    background-image:
+      radial-gradient(
+        ellipse 80% 60% at 50% 0%,
+        oklch(0.96 0.012 70 / 80%) 0%,
+        transparent 70%
+      );
+    background-attachment: fixed;
+  }
+  /* Dark mode: espresso depth gradient */
+  .dark body {
+    background-image:
+      radial-gradient(
+        ellipse 80% 60% at 50% 0%,
+        oklch(0.16 0.022 44 / 60%) 0%,
+        transparent 70%
+      );
+    background-attachment: fixed;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+      max-width: 640px;
+    }
+  }
+
+  /* Premium card glow on hover */
+  .card-premium {
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
+  :root:not(.dark) .card-premium:hover {
+    box-shadow: 0 0 0 1px oklch(0.62 0.14 65 / 20%), 0 8px 32px oklch(0 0 0 / 10%);
+    transform: translateY(-1px);
+  }
+  .dark .card-premium:hover {
+    box-shadow: 0 0 0 1px oklch(0.82 0.09 82 / 20%), 0 8px 32px oklch(0 0 0 / 40%);
+    transform: translateY(-1px);
+  }
+
+  /* Gold shimmer text */
+  :root:not(.dark) .text-gold {
+    background: linear-gradient(135deg, oklch(0.58 0.12 62) 0%, oklch(0.52 0.16 58) 50%, oklch(0.62 0.10 68) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .dark .text-gold {
+    background: linear-gradient(135deg, oklch(0.88 0.08 80) 0%, oklch(0.78 0.12 78) 50%, oklch(0.92 0.06 88) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Pulse animation for voice recording */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Fade in animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* Staggered children animation */
+.stagger-children > * {
+  opacity: 0;
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.4s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.55s; }
+
+/* Gold shimmer animation for loading */
+@keyframes gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-gold {
+  background: linear-gradient(
+    90deg,
+    oklch(0.76 0.08 78) 0%,
+    oklch(0.91 0.09 86) 40%,
+    oklch(0.83 0.10 82) 60%,
+    oklch(0.76 0.08 78) 100%
+  );
+  background-size: 200% auto;
+  animation: gold-shimmer 2.5s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

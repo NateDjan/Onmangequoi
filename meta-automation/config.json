@@ -1,0 +1,16 @@
+{
+  "page_id": "1079436381928091",
+  "page_name": "On Mange Quoi?",
+  "app_id": "1434811375344063",
+  "app_name": "OnMangeQuoi Bot",
+  "page_token": "EAAUY9A5Y2b8BRiXRBJjOnkRZBO3waHc9pgZAcoZAB8MC94ZAyMCR0UJpsWs7mtSp3M5K8zooAFfDInc8JZBjzGEYMC0wjN79DSaXPRcSJZBLG2RZAY0ElfWXE6hWzblvHMud0sE3F4nss6aVf2TWN1ZBqhA53Gtq74wFVn2c1YkBbU6oT3L6b4dYJlZBRKLSMBZBrOAwZDZD",
+  "token_note": "Page token PERMANENT with instagram_basic + instagram_content_publish scopes",
+  "site_url": "https://onmangequoi.net",
+  "token_expires_ts": 0,
+  "token_expires_readable": "never (permanent)",
+  "instagram_user_id": "17841426644776351",
+  "instagram_username": "onmangequoi_app",
+  "tiktok_client_key": "aw0x2gtjdogb6pw1",
+  "tiktok_client_secret": "65yUbhZmq0B0H4tBl4cOyglwjDbOg0Az",
+  "tiktok_redirect_uri": "https://www.onmangequoi.net"
+}

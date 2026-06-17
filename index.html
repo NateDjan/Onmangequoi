@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- Google Analytics (single init, SPA config handled in React) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LNY16C49XG"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-LNY16C49XG', {
+        send_page_view: false,
+        page_title: 'On mange quoi ?'
+      });
+    </script>
+
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>On mange quoi ?</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="On mange quoi" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Theme color (dynamically updated by ThemeContext) -->
+    <meta name="theme-color" content="#f8f5f0" />
+    <meta name="msapplication-TileColor" content="#f8f5f0" />
+
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="2WQBOYDqaeACBD2rfxoH8JGTbQTGW_fTir3sKCKnpCc" />
+
+    <!-- TikTok Domain Verification -->
+    <meta name="tiktok-developers-site-verification" content="Vo7jJVYCWLWehoIOAaycAkamj6gQahpl" />
+
+    <!-- SEO -->
+    <meta name="description" content="Prends en photo ton frigo ou ton placard et l'IA te propose des recettes et menus personnalisés en quelques secondes. Tes repas de la semaine en quelques secondes, personnalisés selon ce que tu as chez toi." />
+    <meta name="keywords" content="recette frigo, idée repas, que manger ce soir, recette avec les ingrédients que j'ai, menu semaine, idée cuisine, recette facile, intelligence artificielle recette" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://onmangequoi.net" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://onmangequoi.net" />
+    <meta property="og:title" content="On mange quoi ? — Recettes IA depuis ton frigo" />
+    <meta property="og:description" content="Prends en photo ton frigo ou ton placard et l'IA te propose des recettes et menus personnalisés en quelques secondes. Tes repas de la semaine en quelques secondes, personnalisés selon ce que tu as chez toi." />
+    <meta property="og:image" content="https://onmangequoi.net/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="On mange quoi ?" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="On mange quoi ? — Recettes IA depuis ton frigo" />
+    <meta name="twitter:description" content="Prends en photo ton frigo et l'IA te propose des recettes personnalisées en quelques secondes." />
+    <meta name="twitter:image" content="https://onmangequoi.net/og-image.png" />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "On mange quoi ?",
+      "url": "https://onmangequoi.net",
+      "description": "Application web qui analyse les photos de ton frigo et te propose des recettes et menus personnalisés grâce à l'intelligence artificielle.",
+      "applicationCategory": "FoodAndDrink",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "featureList": [
+        "Analyse photo du frigo par IA",
+        "Proposition de recettes personnalisées",
+        "Génération de menus de la semaine",
+        "Recherche par ingrédients",
+        "Interface vocale"
+      ],
+      "inLanguage": "fr",
+      "author": {
+        "@type": "Organization",
+        "name": "On mange quoi ?",
+        "url": "https://onmangequoi.net"
+      }
+    }
+    </script>
+
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4947224241575125"
+            crossorigin="anonymous"></script>
+
+    <!-- AdSense navigation exclusion zones -->
+    <!-- Elements with data-noads="true" are excluded from Auto Ads placement -->
+    <style>
+      /* Prevent Auto Ads from injecting inside navigation elements */
+      [data-noads="true"] ins.adsbygoogle,
+      [data-noads="true"] .adsbygoogle {
+        display: none !important;
+      }
+      /* Ensure clear visual separation around affiliate links */
+      .affiliate-section {
+        border-top: 1px solid rgba(255,255,255,0.06);
+        margin-top: 12px;
+        padding-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Static content for search engine indexability (SPA renders over this) -->
+    <div id="root">
+      <div style="display:none" aria-hidden="true">
+        <h1>On mange quoi ? — Recettes IA depuis ton frigo</h1>
+        <p>Prends en photo ton frigo ou ton placard et l'IA te propose des recettes et menus personnalisés en quelques secondes. Tes repas de la semaine générés automatiquement selon ce que tu as chez toi.</p>
+        <p>Idées repas du soir, recettes avec les ingrédients que j'ai, que manger ce soir — la solution gratuite pour ne plus jamais manquer d'inspiration culinaire.</p>
+        <a href="/recettes">Voir toutes les recettes</a>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

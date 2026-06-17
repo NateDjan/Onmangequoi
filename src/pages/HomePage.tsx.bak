@@ -1,0 +1,1700 @@
+import { useAction, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
+import type { Id } from "../../convex/_generated/dataModel";
+import {
+  ArrowLeft,
+  Bookmark,
+  Camera,
+  Check,
+  ChefHat,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Flame,
+  History,
+  Mic,
+  MicOff,
+  Pencil,
+  Plus,
+  RotateCcw,
+  ScanSearch,
+  ShoppingCart,
+  Sparkles,
+  Trash2,
+  UserPlus,
+  UtensilsCrossed,
+  Users,
+  X,
+} from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { api } from "../../convex/_generated/api";
+
+// ─── Types ────────────────────────────────────────────
+
+interface Menu {
+  name: string;
+  type?: string;
+  description: string;
+  cookingTime: string;
+  difficulty: string;
+  servings: number;
+  ingredients: string[];
+  steps: string[];
+  imagePrompt: string;
+  extras: string[];
+  calories?: number;
+}
+
+interface DetectedItem {
+  name: string;
+  confidence: string;
+  category: string;
+  confirmed: boolean;
+  editing: boolean;
+}
+
+type Phase = "input" | "analyzing" | "confirm" | "loading" | "results";
+
+const PHASE_TITLES: Record<Phase, string> = {
+  input: "On mange quoi ?",
+  analyzing: "Analyse en cours…",
+  confirm: "Vérifier les ingrédients",
+  loading: "Préparation…",
+  results: "Mes suggestions",
+};
+
+// ─── Loading Messages ─────────────────────────────────
+
+const LOADING_MESSAGES = [
+  "🔍 Je fouille dans tes placards…",
+  "👨‍🍳 Je prépare mes meilleures recettes…",
+  "🍳 Ça mijote, encore un instant…",
+  "✨ Je mets les petits plats dans les grands…",
+  "🧂 J'assaisonne tout ça…",
+  "🍽️ Dernières touches de présentation…",
+];
+
+const ANALYZING_MESSAGES = [
+  "📸 J'observe ta photo…",
+  "🔎 Je repère les aliments…",
+  "🧠 L'IA analyse ton image…",
+  "👀 Je regarde dans les coins…",
+  "🍽️ Encore un instant…",
+  "🔬 Analyse approfondie en cours…",
+  "✨ Presque fini…",
+];
+
+// Category emoji mapping
+const CATEGORY_EMOJI: Record<string, string> = {
+  "produit laitier": "🥛",
+  légume: "🥬",
+  fruit: "🍎",
+  viande: "🥩",
+  poisson: "🐟",
+  boisson: "🥤",
+  condiment: "🧂",
+  féculent: "🍞",
+  surgelé: "🧊",
+  autre: "📦",
+};
+
+// ─── Pollinations.ai image URL builder (no API call, browser loads directly) ──
+function pollinationsUrl(prompt: string, seed: number, retry = 0): string {
+  const encoded = encodeURIComponent(prompt);
+  const bust = retry > 0 ? `&_r=${retry}` : "";
+  // model=turbo is ~4x faster than default flux; 400px gives good quality at mobile size
+  return `https://image.pollinations.ai/prompt/${encoded}?width=400&height=400&nologo=true&model=turbo&seed=${seed + 1}${bust}`;
+}
+
+// Fetch a Wikipedia thumbnail for a food ingredient name.
+// Strategy: try French Wikipedia first (ingredient names are in French),
+// then English, then fall back to emoji.
+async function fetchWikipediaThumbnail(name: string): Promise<string | null> {
+  // Strip adjectives/qualifiers to get the base ingredient (e.g. "Tomates cocktail" → "Tomate")
+  const simplified = name
+    .replace(/\s+(cocktail|grappe|charnues?|côtelées?\s+noires?|blancs?\s+en\s+botte|rouges?|verts?|jaunes?|fraîches?|frais|en\s+botte|iceberg)\b/gi, "")
+    .trim();
+
+  const candidates = [
+    simplified,   // "Tomate"
+    name,         // "Tomates cocktail" (original)
+  ].filter(Boolean);
+
+  for (const term of candidates) {
+    for (const lang of ["fr", "en"]) {
+      try {
+        const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const thumb = data?.thumbnail?.source as string | undefined;
+        if (thumb) return thumb;
+      } catch {
+        // try next
+      }
+    }
+  }
+  return null;
+}
+
+// Small thumbnail for each ingredient — lazy loads Wikipedia photo, falls back to emoji
+function IngredientThumbnail({ name, fallbackEmoji }: { name: string; fallbackEmoji: string }) {
+  const [src, setSrc] = useState<string | null>(() => {
+    // Check localStorage cache on init to avoid flash
+    const cached = localStorage.getItem(`ing_thumb_v2_${name.toLowerCase().trim()}`);
+    if (cached && cached !== "failed") return cached;
+    return null;
+  });
+  const [failed, setFailed] = useState(() => {
+    return localStorage.getItem(`ing_thumb_v2_${name.toLowerCase().trim()}`) === "failed";
+  });
+
+  useEffect(() => {
+    if (src || failed) return; // Already resolved
+    const cacheKey = `ing_thumb_v2_${name.toLowerCase().trim()}`;
+    fetchWikipediaThumbnail(name).then((url) => {
+      if (url) {
+        localStorage.setItem(cacheKey, url);
+        setSrc(url);
+      } else {
+        localStorage.setItem(cacheKey, "failed");
+        setFailed(true);
+      }
+    });
+  }, [name, src, failed]);
+
+  if (failed || !src) {
+    return <span className="text-lg shrink-0">{fallbackEmoji}</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      className="size-8 rounded-lg object-cover shrink-0 border border-white/10"
+      onError={() => {
+        const cacheKey = `ing_thumb_v2_${name.toLowerCase().trim()}`;
+        localStorage.setItem(cacheKey, "failed");
+        setSrc(null);
+        setFailed(true);
+      }}
+    />
+  );
+}
+
+// ─── Main Component ───────────────────────────────────
+
+export function HomePage() {
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem("onboarding_done_v1");
+  });
+  const [ingredients, setIngredients] = useState("");
+  const [preferences, setPreferences] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [phase, setPhaseRaw] = useState<Phase>("input");
+  const [_phaseHistory, setPhaseHistory] = useState<Phase[]>([]);
+  const [menus, setMenus] = useState<Menu[]>([]);
+  const [menuImages, setMenuImages] = useState<Record<number, string>>({});
+  const [expandedMenu, setExpandedMenu] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+  const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
+  const [analysisSummary, setAnalysisSummary] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+  const [historySaved, setHistorySaved] = useState(false);
+  const [historyId, setHistoryId] = useState<Id<"menuHistory"> | null>(null);
+
+  // Auth
+  const { isAuthenticated } = useConvexAuth();
+  const navigate = useNavigate();
+  const saveHistory = useMutation(api.menuHistory.saveHistory);
+  const updateHistoryImages = useMutation(api.menuHistory.updateHistoryImages);
+  // Phase navigation with history
+  const setPhase = useCallback((next: Phase) => {
+    setPhaseRaw((prev) => {
+      // Don't push loading/analyzing to history (transient phases)
+      if (prev !== "loading" && prev !== "analyzing") {
+        setPhaseHistory((h) => [...h, prev]);
+      }
+      return next;
+    });
+  }, []);
+
+  const goBack = useCallback(() => {
+    setPhaseHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setPhaseRaw(prev);
+      return h.slice(0, -1);
+    });
+  }, []);
+
+  const canGoBack = phase !== "input" && phase !== "loading" && phase !== "analyzing";
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const suggestMenus = useAction(api.viktorTools.suggestMenus);
+  const generateUploadUrl = useAction(api.viktorTools.generateUploadUrl);
+  const getStorageUrl = useAction(api.viktorTools.getStorageUrl);
+  const triggerPhotoAnalysis = useAction(api.viktorTools.triggerPhotoAnalysis);
+  const createAnalysis = useMutation(api.photoAnalysis.createAnalysis);
+  const [analysisId, setAnalysisId] = useState<Id<"photoAnalysis"> | null>(null);
+  const analysisResult = useQuery(
+    api.photoAnalysis.getAnalysis,
+    analysisId ? { id: analysisId } : "skip",
+  );
+
+  const voice = useVoiceInput();
+
+
+  // Handle analysis result from cron polling
+  useEffect(() => {
+    if (!analysisResult) return;
+    if (analysisResult.status === "pending" || analysisResult.status === "processing") return;
+
+    if (analysisResult.status === "done") {
+      try {
+        const items = JSON.parse(analysisResult.items) as Array<{
+          name: string;
+          confidence: string;
+          category: string;
+        }>;
+        setDetectedItems(
+          items.map((item) => ({
+            ...item,
+            confirmed: item.confidence === "haute",
+            editing: false,
+          })),
+        );
+        setAnalysisSummary(analysisResult.summary);
+      } catch {
+        setDetectedItems([]);
+        setAnalysisSummary("Analyse terminée");
+      }
+      setAnalysisId(null);
+      setPhase("confirm");
+    } else if (analysisResult.status === "error") {
+      setAnalysisId(null);
+      setDetectedItems([]);
+      setAnalysisSummary(analysisResult.summary);
+      setPhase("confirm");
+    }
+  }, [analysisResult]);
+
+  // Update history images as they arrive
+  useEffect(() => {
+    if (!historyId || !historySaved) return;
+    const imageCount = Object.keys(menuImages).length;
+    if (imageCount === 0) return;
+    // Debounce: only update when all 3 images are ready (or at least some)
+    const timer = setTimeout(() => {
+      updateHistoryImages({
+        id: historyId,
+        menuImages: JSON.stringify(menuImages),
+      }).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [menuImages, historyId, historySaved, updateHistoryImages]);
+
+  // Rotate loading messages
+  useEffect(() => {
+    if (phase !== "loading" && phase !== "analyzing") return;
+    const messages = phase === "analyzing" ? ANALYZING_MESSAGES : LOADING_MESSAGES;
+    const interval = setInterval(() => {
+      setLoadingMsgIndex((i) => (i + 1) % messages.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  // Append voice transcript to ingredients
+  useEffect(() => {
+    if (voice.transcript) {
+      setIngredients(voice.transcript);
+    }
+  }, [voice.transcript]);
+
+  // Auto-resize textarea
+  const handleTextareaChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setIngredients(e.target.value);
+      e.target.style.height = "auto";
+      e.target.style.height = `${e.target.scrollHeight}px`;
+    },
+    [],
+  );
+
+  // Photo capture
+  // Resize image to max 1200px and compress to JPEG for fast AI analysis
+  const compressImage = useCallback(
+    (file: File): Promise<File> =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1200;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            const ratio = Math.min(MAX / width, MAX / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+              } else {
+                resolve(file);
+              }
+            },
+            "image/jpeg",
+            0.75,
+          );
+        };
+        img.onerror = () => resolve(file);
+        img.src = URL.createObjectURL(file);
+      }),
+    [],
+  );
+
+  const handlePhotoCapture = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setPhotoPreview(url);
+        // Compress before storing for upload
+        const compressed = await compressImage(file);
+        setPhotoFile(compressed);
+      }
+    },
+    [compressImage],
+  );
+
+  const removePhoto = useCallback(() => {
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setDetectedItems([]);
+    setAnalysisSummary("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  // Analyze photo with AI — upload + immediately trigger cron agent
+  const handleAnalyzePhoto = useCallback(async () => {
+    if (!photoFile) return;
+
+    setPhase("analyzing");
+    setLoadingMsgIndex(0);
+    setError(null);
+
+    try {
+      // 1. Upload photo to Convex storage
+      const uploadUrl = await generateUploadUrl();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": photoFile.type },
+        body: photoFile,
+      });
+      const { storageId } = await uploadResponse.json();
+
+      // 2. Get public URL
+      const imageUrl = await getStorageUrl({ storageId });
+      if (!imageUrl) throw new Error("Impossible d'obtenir l'URL de la photo");
+
+      // 3. Create pending analysis record in Convex
+      const id = await createAnalysis({ storageId, imageUrl });
+      setAnalysisId(id);
+
+      // 4. Immediately trigger the photo analysis cron agent (no 60s wait!)
+      await triggerPhotoAnalysis({});
+      // useQuery will poll automatically — useEffect above handles the result
+    } catch (err) {
+      console.error("Photo analysis error:", err);
+      setError("Erreur lors de l'envoi de la photo. Réessaie !");
+      setPhase("input");
+    }
+  }, [photoFile, generateUploadUrl, getStorageUrl, createAnalysis, triggerPhotoAnalysis]);
+
+  // Confirm detected items and generate menus
+  const handleConfirmAndGenerate = useCallback(async () => {
+    const confirmedItems = detectedItems
+      .filter((i) => i.confirmed)
+      .map((i) => i.name);
+
+    // Combine detected items with any manually typed ingredients
+    const allIngredients = [
+      ...confirmedItems,
+      ...ingredients
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ];
+
+    if (allIngredients.length === 0) {
+      setError("Confirme au moins un ingrédient !");
+      return;
+    }
+
+    setPhase("loading");
+    setLoadingMsgIndex(0);
+    setError(null);
+    setMenuImages({});
+
+    try {
+      const result = await suggestMenus({
+        ingredients: allIngredients.join(", "),
+        preferences: preferences.trim() || undefined,
+      });
+      setMenus(result.menus);
+      setHistorySaved(false);
+      setHistoryId(null);
+      setPhase("results");
+
+      // Auto-save if authenticated
+      if (isAuthenticated) {
+        try {
+          const hId = await saveHistory({
+            ingredients: allIngredients.join(", "),
+            preferences: preferences.trim() || undefined,
+            menus: JSON.stringify(result.menus),
+            photoUrl: photoPreview || undefined,
+          });
+          setHistoryId(hId);
+          setHistorySaved(true);
+        } catch {
+          // save failed silently
+        }
+      }
+
+      // Load all images in parallel (model=turbo is fast enough for concurrent requests)
+      if (result.menus.length > 0) {
+        const all: Record<number, string> = {};
+        result.menus.forEach((menu, i) => {
+          all[i] = pollinationsUrl(menu.imagePrompt, i);
+        });
+        setMenuImages(all);
+      }
+    } catch (_err) {
+      setError("Oups ! Quelque chose s'est mal passé. Réessaie !");
+      setPhase("confirm");
+    }
+  }, [detectedItems, ingredients, preferences, suggestMenus, isAuthenticated, saveHistory, photoPreview]);
+
+  // Submit (text-only, no photo)
+  const handleSubmit = useCallback(async () => {
+    const trimmed = ingredients.trim();
+
+    // If there's a photo that hasn't been analyzed, analyze it first
+    if (photoFile && detectedItems.length === 0) {
+      await handleAnalyzePhoto();
+      return;
+    }
+
+    if (!trimmed && detectedItems.length === 0) {
+      textareaRef.current?.focus();
+      return;
+    }
+    setPhase("loading");
+    setLoadingMsgIndex(0);
+    setError(null);
+    setMenuImages({});
+
+    try {
+      const result = await suggestMenus({
+        ingredients: trimmed,
+        preferences: preferences.trim() || undefined,
+      });
+      setMenus(result.menus);
+      setHistorySaved(false);
+      setHistoryId(null);
+      setPhase("results");
+
+      // Auto-save if authenticated
+      if (isAuthenticated) {
+        try {
+          const hId = await saveHistory({
+            ingredients: trimmed,
+            preferences: preferences.trim() || undefined,
+            menus: JSON.stringify(result.menus),
+          });
+          setHistoryId(hId);
+          setHistorySaved(true);
+        } catch {
+          // save failed silently
+        }
+      }
+
+      // Load all images in parallel (model=turbo is fast enough for concurrent requests)
+      if (result.menus.length > 0) {
+        const all: Record<number, string> = {};
+        result.menus.forEach((menu, i) => {
+          all[i] = pollinationsUrl(menu.imagePrompt, i);
+        });
+        setMenuImages(all);
+      }
+    } catch (_err) {
+      setError("Oups ! Quelque chose s'est mal passé. Réessaie !");
+      setPhase("input");
+    }
+  }, [
+    ingredients,
+    preferences,
+    suggestMenus,
+    photoFile,
+    detectedItems,
+    handleAnalyzePhoto,
+    isAuthenticated,
+    saveHistory,
+  ]);
+
+  // Restart
+  const handleRestart = useCallback(() => {
+    setPhaseRaw("input");
+    setPhaseHistory([]);
+    setMenus([]);
+    setMenuImages({});
+    setIngredients("");
+    setPreferences("");
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setExpandedMenu(null);
+    setError(null);
+    setDetectedItems([]);
+    setAnalysisSummary("");
+    setNewItemName("");
+    setAnalysisId(null);
+    setHistorySaved(false);
+    setHistoryId(null);
+    voice.resetTranscript();
+  }, [voice]);
+
+  // Toggle voice
+  const toggleVoice = useCallback(() => {
+    if (voice.isListening) {
+      voice.stopListening();
+    } else {
+      voice.startListening();
+    }
+  }, [voice]);
+
+  // Toggle item confirmed
+  const toggleItem = useCallback((index: number) => {
+    setDetectedItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, confirmed: !item.confirmed } : item,
+      ),
+    );
+  }, []);
+
+  // Edit item name
+  const startEditItem = useCallback((index: number) => {
+    setDetectedItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, editing: true } : item,
+      ),
+    );
+  }, []);
+
+  const saveEditItem = useCallback((index: number, newName: string) => {
+    setDetectedItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, name: newName, editing: false, confirmed: true }
+          : item,
+      ),
+    );
+  }, []);
+
+  // Remove item
+  const removeItem = useCallback((index: number) => {
+    setDetectedItems((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Add custom item
+  const addItem = useCallback(() => {
+    if (!newItemName.trim()) return;
+    setDetectedItems((prev) => [
+      ...prev,
+      {
+        name: newItemName.trim(),
+        confidence: "haute",
+        category: "autre",
+        confirmed: true,
+        editing: false,
+      },
+    ]);
+    setNewItemName("");
+  }, [newItemName]);
+
+  const handleCloseOnboarding = () => {
+    localStorage.setItem("onboarding_done_v1", "1");
+    setShowOnboarding(false);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* ─── Onboarding Modal ─── */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+               style={{ background: "linear-gradient(160deg, #2a1a10 0%, #1a0f0a 100%)", border: "1px solid rgba(212,175,55,0.2)" }}>
+            {/* Header */}
+            <div className="px-6 pt-8 pb-4 text-center">
+              <div className="text-5xl mb-3">🍽️</div>
+              <h2 className="text-2xl font-bold text-foreground mb-1">On mange quoi ?</h2>
+              <p className="text-sm text-primary font-medium tracking-wide uppercase">Ton frigo a la parole</p>
+            </div>
+
+            {/* Steps */}
+            <div className="px-6 pb-6 space-y-3">
+              {[
+                { icon: "📸", title: "Prends une photo", desc: "de tes ingrédients ou de ton frigo" },
+                { icon: "✅", title: "Vérifie la liste", desc: "ajuste ce que l'IA a détecté" },
+                { icon: "🤩", title: "Choisis ton menu", desc: "3 recettes adaptées à ce que tu as" },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <span className="text-2xl shrink-0">{icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{title}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <div className="px-6 pb-8">
+              <button
+                type="button"
+                onClick={handleCloseOnboarding}
+                className="w-full py-4 rounded-2xl text-base font-bold tracking-wide transition-all active:scale-95"
+                style={{ background: "linear-gradient(135deg, #c9a84c 0%, #e8c96a 50%, #c9a84c 100%)", color: "#1a0f0a" }}
+              >
+                Bon appétit 🍴
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation bar */}
+      {canGoBack && (
+        <nav className="sticky top-14 z-40 bg-background/80 backdrop-blur-md border-b border-border/30">
+          <div className="flex items-center h-11 px-4 max-w-md mx-auto">
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition -ml-1 py-1 pr-2"
+            >
+              <ArrowLeft className="size-4" />
+              Retour
+            </button>
+            <span className="flex-1 text-center text-sm font-semibold text-muted-foreground truncate px-2">
+              {PHASE_TITLES[phase]}
+            </span>
+            <div className="w-16" /> {/* Spacer to balance back button */}
+          </div>
+        </nav>
+      )}
+
+      {phase === "input" && (
+        <InputSection
+          ingredients={ingredients}
+          preferences={preferences}
+          photoPreview={photoPreview}
+          error={error}
+          voiceSupported={voice.isSupported}
+          isListening={voice.isListening}
+          hasPhoto={!!photoFile}
+          textareaRef={textareaRef}
+          fileInputRef={fileInputRef}
+          onIngredientsChange={handleTextareaChange}
+          onPreferencesChange={setPreferences}
+          onPhotoCapture={handlePhotoCapture}
+          onRemovePhoto={removePhoto}
+          onToggleVoice={toggleVoice}
+          onAnalyzePhoto={handleAnalyzePhoto}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {phase === "analyzing" && (
+        <LoadingSection
+          message={ANALYZING_MESSAGES[loadingMsgIndex % ANALYZING_MESSAGES.length]}
+          subtitle="L'IA analyse ta photo en profondeur… (~1 min)"
+          emojis={["📸", "🔍", "🧠"]}
+        />
+      )}
+
+      {phase === "confirm" && (
+        <ConfirmSection
+          photoPreview={photoPreview}
+          summary={analysisSummary}
+          items={detectedItems}
+          preferences={preferences}
+          newItemName={newItemName}
+          error={error}
+          onPreferencesChange={setPreferences}
+          onToggleItem={toggleItem}
+          onEditItem={startEditItem}
+          onSaveEdit={saveEditItem}
+          onRemoveItem={removeItem}
+          onNewItemNameChange={setNewItemName}
+          onAddItem={addItem}
+          onConfirm={handleConfirmAndGenerate}
+          onRestart={handleRestart}
+        />
+      )}
+
+      {phase === "loading" && (
+        <LoadingSection
+          message={LOADING_MESSAGES[loadingMsgIndex % LOADING_MESSAGES.length]}
+          subtitle="Ça arrive, promis !"
+          emojis={["🥘", "🍳", "🥗"]}
+        />
+      )}
+
+      {phase === "results" && (
+        <ResultsSection
+          menus={menus}
+          menuImages={menuImages}
+          expandedMenu={expandedMenu}
+          isAuthenticated={isAuthenticated}
+          historySaved={historySaved}
+          onToggleExpand={setExpandedMenu}
+          onRestart={handleRestart}
+          onNavigateSignup={() => navigate("/signup")}
+          onNavigateHistory={() => navigate("/history")}
+          onImageLoaded={(_index) => {
+            // No-op: all images load in parallel with model=turbo
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Input Section ────────────────────────────────────
+
+function InputSection({
+  ingredients,
+  preferences,
+  photoPreview,
+  error,
+  voiceSupported,
+  isListening,
+  hasPhoto,
+  textareaRef,
+  fileInputRef,
+  onIngredientsChange,
+  onPreferencesChange,
+  onPhotoCapture,
+  onRemovePhoto,
+  onToggleVoice,
+  onAnalyzePhoto,
+  onSubmit,
+}: {
+  ingredients: string;
+  preferences: string;
+  photoPreview: string | null;
+  error: string | null;
+  voiceSupported: boolean;
+  isListening: boolean;
+  hasPhoto: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onIngredientsChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onPreferencesChange: (v: string) => void;
+  onPhotoCapture: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemovePhoto: () => void;
+  onToggleVoice: () => void;
+  onAnalyzePhoto: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col items-center px-4 py-8 md:py-12 animate-fade-in-up">
+      <div className="w-full max-w-md space-y-6">
+        {/* Hero */}
+        <div className="text-center space-y-3 pb-2">
+          <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-primary/10 ring-1 ring-primary/20 mb-1">
+            <span className="text-3xl">🍽️</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gold">
+            On mange quoi ?
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Prends une photo ou dis-moi ce que tu as dans le frigo
+          </p>
+        </div>
+
+        {/* Photo preview */}
+        {photoPreview && (
+          <div className="relative rounded-xl overflow-hidden border border-border shadow-sm">
+            <img
+              src={photoPreview}
+              alt="Ton frigo"
+              className="w-full h-48 object-cover"
+            />
+            <button
+              type="button"
+              onClick={onRemovePhoto}
+              className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/70 transition"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-3">
+              <p className="text-white text-sm font-medium">
+                📸 Photo prête ! L'IA va l'analyser
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Analyze photo button (when photo is present) */}
+        {hasPhoto && (
+          <Button
+            type="button"
+            onClick={onAnalyzePhoto}
+            size="lg"
+            className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/35 transition-all"
+          >
+            <ScanSearch className="size-5" />
+            Analyser ma photo
+          </Button>
+        )}
+
+        {/* Divider */}
+        {hasPhoto && (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground font-medium">ou tape tes ingrédients</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+        )}
+
+        {/* Ingredients input */}
+        <div className="space-y-2">
+          <label
+            htmlFor="ingredients"
+            className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+          >
+            <UtensilsCrossed className="size-4 text-primary" />
+            Qu'est-ce que tu as ?
+          </label>
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              id="ingredients"
+              value={ingredients}
+              onChange={onIngredientsChange}
+              placeholder="Tomates, poulet, riz, crème fraîche, oignons…"
+              rows={3}
+              className="w-full rounded-xl border border-white/8 bg-card px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 resize-none transition"
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onPhotoCapture}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 gap-2 h-10 rounded-lg border-white/8 bg-card hover:bg-white/5"
+            >
+              <Camera className="size-4" />
+              <span>📷 Photo</span>
+            </Button>
+
+            {voiceSupported && (
+              <Button
+                type="button"
+                variant={isListening ? "default" : "outline"}
+                size="sm"
+                onClick={onToggleVoice}
+                className={`flex-1 gap-2 h-10 rounded-lg ${
+                  isListening
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "border-border/80 bg-card hover:bg-secondary"
+                }`}
+              >
+                <div className="relative">
+                  {isListening ? (
+                    <MicOff className="size-4" />
+                  ) : (
+                    <Mic className="size-4" />
+                  )}
+                  {isListening && (
+                    <span className="absolute -inset-1.5 rounded-full bg-primary-foreground/30 animate-pulse-ring" />
+                  )}
+                </div>
+                <span>{isListening ? "Arrêter" : "Dicter"}</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Preferences */}
+        <div className="space-y-2">
+          <label
+            htmlFor="preferences"
+            className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+          >
+            <Sparkles className="size-4 text-chart-2" />
+            Une envie particulière ?
+            <span className="text-muted-foreground font-normal">(optionnel)</span>
+          </label>
+          <input
+            id="preferences"
+            type="text"
+            value={preferences}
+            onChange={(e) => onPreferencesChange(e.target.value)}
+            placeholder="Rapide et léger, cuisine italienne, comfort food…"
+            className="w-full rounded-xl border border-white/8 bg-card px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition"
+          />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-destructive/10 text-destructive rounded-xl px-4 py-3 text-sm font-medium">
+            {error}
+          </div>
+        )}
+
+        {/* Submit (text mode — no photo) */}
+        {!hasPhoto && (
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={!ingredients.trim()}
+            size="lg"
+            className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:shadow-none"
+          >
+            <ChefHat className="size-5" />
+            Propose-moi des menus !
+          </Button>
+        )}
+
+        {/* Helper text */}
+        <p className="text-center text-xs text-muted-foreground/70">
+          📸 Photo = l'IA identifie tes ingrédients • ✍️ Texte = tu les décris toi-même
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Confirm Section (after photo analysis) ───────────
+
+function ConfirmSection({
+  photoPreview,
+  summary,
+  items,
+  preferences,
+  newItemName,
+  error,
+  onPreferencesChange,
+  onToggleItem,
+  onEditItem,
+  onSaveEdit,
+  onRemoveItem,
+  onNewItemNameChange,
+  onAddItem,
+  onConfirm,
+  onRestart,
+}: {
+  photoPreview: string | null;
+  summary: string;
+  items: DetectedItem[];
+  preferences: string;
+  newItemName: string;
+  error: string | null;
+  onPreferencesChange: (v: string) => void;
+  onToggleItem: (index: number) => void;
+  onEditItem: (index: number) => void;
+  onSaveEdit: (index: number, name: string) => void;
+  onRemoveItem: (index: number) => void;
+  onNewItemNameChange: (v: string) => void;
+  onAddItem: () => void;
+  onConfirm: () => void;
+  onRestart: () => void;
+}) {
+  const confirmedCount = items.filter((i) => i.confirmed).length;
+
+  return (
+    <div className="flex-1 flex flex-col items-center px-4 py-6 md:py-10 animate-fade-in-up">
+      <div className="w-full max-w-md space-y-5">
+        {/* Header with photo thumbnail */}
+        <div className="flex items-start gap-3">
+          {photoPreview && (
+            <img
+              src={photoPreview}
+              alt="Ta photo"
+              className="size-16 rounded-xl object-cover border border-border shadow-sm shrink-0"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold shimmer-gold">
+              {items.some((i) => i.confidence !== "suggestion") ? "Voilà ce que je vois ! 👀" : "Qu'as-tu dans ta cuisine ? 🍳"}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5 leading-snug">
+              {summary}
+            </p>
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="bg-white/4 border border-white/6 rounded-xl px-4 py-3 text-sm text-muted-foreground">
+          <p>
+            <strong className="text-foreground">Vérifie les ingrédients</strong> — coche ✅ ceux que tu veux utiliser, corrige les erreurs avec ✏️, ou ajoute ce qui manque.
+          </p>
+        </div>
+
+        {/* Detected items list */}
+        <div className="space-y-2">
+          {items.map((item, index) => (
+            <IngredientRow
+              key={`${item.name}-${index}`}
+              item={item}
+              index={index}
+              onToggle={onToggleItem}
+              onEdit={onEditItem}
+              onSaveEdit={onSaveEdit}
+              onRemove={onRemoveItem}
+            />
+          ))}
+        </div>
+
+        {/* Add custom item */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newItemName}
+            onChange={(e) => onNewItemNameChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onAddItem()}
+            placeholder="Ajouter un ingrédient…"
+            className="flex-1 rounded-xl border border-input bg-card px-4 py-2.5 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary/50 transition shadow-sm"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddItem}
+            disabled={!newItemName.trim()}
+            className="h-10 rounded-xl gap-1 px-3"
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
+
+        {/* Preferences */}
+        <div className="space-y-2">
+          <label
+            htmlFor="preferences-confirm"
+            className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+          >
+            <Sparkles className="size-4 text-chart-2" />
+            Une envie ?
+            <span className="text-muted-foreground font-normal">(optionnel)</span>
+          </label>
+          <input
+            id="preferences-confirm"
+            type="text"
+            value={preferences}
+            onChange={(e) => onPreferencesChange(e.target.value)}
+            placeholder="Rapide, comfort food, cuisine asiatique…"
+            className="w-full rounded-xl border border-white/8 bg-card px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition"
+          />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-destructive/10 text-destructive rounded-xl px-4 py-3 text-sm font-medium">
+            {error}
+          </div>
+        )}
+
+        {/* Confirm button */}
+        <Button
+          type="button"
+          onClick={onConfirm}
+          disabled={confirmedCount === 0}
+          size="lg"
+          className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:shadow-none"
+        >
+          <ChefHat className="size-5" />
+          Proposer des menus ({confirmedCount} ingrédient{confirmedCount > 1 ? "s" : ""})
+        </Button>
+
+        {/* Restart */}
+        <button
+          type="button"
+          onClick={onRestart}
+          className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition py-2"
+        >
+          ← Recommencer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Ingredient Row ───────────────────────────────────
+
+function IngredientRow({
+  item,
+  index,
+  onToggle,
+  onEdit,
+  onSaveEdit,
+  onRemove,
+}: {
+  item: DetectedItem;
+  index: number;
+  onToggle: (i: number) => void;
+  onEdit: (i: number) => void;
+  onSaveEdit: (i: number, name: string) => void;
+  onRemove: (i: number) => void;
+}) {
+  const [editValue, setEditValue] = useState(item.name);
+  const emoji = CATEGORY_EMOJI[item.category] || "📦";
+  const isUncertain = item.confidence === "basse" || item.confidence === "moyenne";
+
+  if (item.editing) {
+    return (
+      <div className="flex items-center gap-2 p-2 rounded-xl bg-card border border-primary/30 shadow-sm">
+        <IngredientThumbnail name={item.name} fallbackEmoji={emoji} />
+        <input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSaveEdit(index, editValue)}
+          autoFocus
+          className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onSaveEdit(index, editValue)}
+          className="h-7 w-7 p-0 shrink-0"
+        >
+          <Check className="size-4 text-primary" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${
+        item.confirmed
+          ? "bg-card border-white/8 shadow-sm"
+          : "bg-white/3 border-white/5 opacity-50"
+      } ${isUncertain && !item.confirmed ? "border-chart-2/40 bg-chart-2/5" : ""}`}
+    >
+      {/* Toggle checkbox */}
+      <button
+        type="button"
+        onClick={() => onToggle(index)}
+        className={`shrink-0 size-6 rounded-lg border-2 flex items-center justify-center transition ${
+          item.confirmed
+            ? "bg-primary border-primary text-primary-foreground"
+            : "border-muted-foreground/30 hover:border-primary/50"
+        }`}
+      >
+        {item.confirmed && <Check className="size-3.5" />}
+      </button>
+
+      {/* Ingredient thumbnail */}
+      <IngredientThumbnail name={item.name} fallbackEmoji={emoji} />
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium truncate block">{item.name}</span>
+        {isUncertain && (
+          <span className="text-xs text-chart-2 font-medium">
+            Pas sûr — corrige si besoin
+          </span>
+        )}
+      </div>
+
+      {/* Edit button */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onEdit(index)}
+        className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+      >
+        <Pencil className="size-3.5" />
+      </Button>
+
+      {/* Remove button */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onRemove(index)}
+        className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+// ─── Ad Banner ────────────────────────────────────────
+// Google AdSense banner — displayed during AI loading (prime attention slot).
+// To activate: replace the placeholder div with the AdSense <ins> tag provided
+// by Google after your site is approved, and uncomment the AdSense script in index.html.
+function AdBanner() {
+  return (
+    <div className="w-full max-w-sm mx-auto mt-6">
+      {/* AdSense slot — replace this div with your <ins class="adsbygoogle"> tag */}
+      <div
+        className="w-full rounded-xl overflow-hidden bg-muted/30 border border-white/5 flex items-center justify-center"
+        style={{ minHeight: 100 }}
+        aria-label="Publicité"
+      >
+        {/* PLACEHOLDER — remplace ce bloc par ton code AdSense une fois approuvé */}
+        <p className="text-xs text-muted-foreground/40 select-none">Publicité</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Loading Section ──────────────────────────────────
+
+function LoadingSection({
+  message,
+  subtitle,
+  emojis,
+}: {
+  message: string;
+  subtitle: string;
+  emojis: string[];
+}) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
+      <div className="text-center space-y-8">
+        {/* Emoji animation */}
+        <div className="flex items-end justify-center gap-3 text-4xl">
+          <span className="animate-bounce-cook">{emojis[0]}</span>
+          <span className="animate-bounce-cook-delayed">{emojis[1]}</span>
+          <span className="animate-bounce-cook-delayed-2">{emojis[2]}</span>
+        </div>
+
+        {/* Message */}
+        <div className="space-y-2">
+          <p className="text-lg font-semibold shimmer-gold transition-all duration-500">
+            {message}
+          </p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+
+        {/* Progress dots */}
+        <div className="flex justify-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="size-2 rounded-full bg-primary/60 animate-pulse"
+              style={{ animationDelay: `${i * 0.3}s` }}
+            />
+          ))}
+        </div>
+
+        {/* Ad banner — shown during loading for maximum visibility */}
+        <AdBanner />
+      </div>
+    </div>
+  );
+}
+
+// ─── Results Section ──────────────────────────────────
+
+function ResultsSection({
+  menus,
+  menuImages,
+  expandedMenu,
+  isAuthenticated,
+  historySaved,
+  onToggleExpand,
+  onRestart,
+  onNavigateSignup,
+  onNavigateHistory,
+  onImageLoaded,
+}: {
+  menus: Menu[];
+  menuImages: Record<number, string>;
+  expandedMenu: number | null;
+  isAuthenticated: boolean;
+  historySaved: boolean;
+  onToggleExpand: (index: number | null) => void;
+  onRestart: () => void;
+  onNavigateSignup: () => void;
+  onNavigateHistory: () => void;
+  onImageLoaded: (index: number) => void;
+}) {
+  return (
+    <div className="flex-1 px-4 py-8 md:py-12">
+      <div className="max-w-md mx-auto space-y-6 stagger-children">
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <h2 className="text-2xl font-bold text-gold">Voilà mes suggestions ! 👨‍🍳</h2>
+          <p className="text-muted-foreground text-sm">
+            3 idées pour régaler tes papilles
+          </p>
+        </div>
+
+        {/* Save status / signup prompt */}
+        {isAuthenticated && historySaved && (
+          <div className="flex items-center justify-center gap-2 bg-primary/5 rounded-xl px-4 py-2.5 text-sm">
+            <Bookmark className="size-4 text-primary" />
+            <span className="text-muted-foreground">
+              Sauvegardé dans ton{" "}
+              <button
+                type="button"
+                onClick={onNavigateHistory}
+                className="font-semibold text-primary hover:underline"
+              >
+                historique
+              </button>
+            </span>
+          </div>
+        )}
+        {!isAuthenticated && (
+          <button
+            type="button"
+            onClick={onNavigateSignup}
+            className="w-full flex items-center gap-3 bg-primary/5 hover:bg-primary/10 rounded-xl px-4 py-3 transition text-left group"
+          >
+            <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition">
+              <UserPlus className="size-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Crée un compte gratuit</p>
+              <p className="text-xs text-muted-foreground">
+                Pour sauvegarder tes menus et retrouver ton historique
+              </p>
+            </div>
+            <History className="size-4 text-muted-foreground/50 shrink-0" />
+          </button>
+        )}
+
+        {/* Menu cards */}
+        {menus.map((menu, index) => (
+          <MenuCard
+            key={menu.name}
+            menu={menu}
+            index={index}
+            imageUrl={menuImages[index]}
+            isExpanded={expandedMenu === index}
+            onToggle={() =>
+              onToggleExpand(expandedMenu === index ? null : index)
+            }
+            onImageLoaded={() => onImageLoaded(index)}
+          />
+        ))}
+
+        {/* Actions */}
+        <div className="space-y-3 pt-2">
+          {isAuthenticated && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onNavigateHistory}
+              className="w-full h-11 rounded-xl gap-2 text-sm font-semibold border-border/80 hover:bg-secondary"
+            >
+              <History className="size-4" />
+              Voir mon historique
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRestart}
+            className="w-full h-12 rounded-xl gap-2 text-base font-semibold border-border/80 hover:bg-secondary"
+          >
+            <RotateCcw className="size-4" />
+            Recommencer
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Menu Card ────────────────────────────────────────
+
+function MenuCard({
+  menu,
+  index,
+  imageUrl,
+  isExpanded,
+  onToggle,
+  onImageLoaded,
+}: {
+  menu: Menu;
+  index: number;
+  imageUrl?: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onImageLoaded?: () => void;
+}) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | undefined>(imageUrl);
+  const retryCountRef = React.useRef(0);
+
+  // Sync src when imageUrl prop changes
+  React.useEffect(() => {
+    setImgSrc(imageUrl);
+    setImgLoaded(false);
+    setImgError(false);
+    retryCountRef.current = 0;
+  }, [imageUrl]);
+
+  const handleImgError = () => {
+    if (retryCountRef.current < 3 && imgSrc) {
+      retryCountRef.current += 1;
+      const delay = retryCountRef.current * 4000;
+      setTimeout(() => {
+        // Cache-bust by adding a retry param
+        const sep = imgSrc.includes("?") ? "&" : "?";
+        setImgSrc(`${imgSrc.split("&_r=")[0]}${sep}_r=${retryCountRef.current}`);
+        setImgError(false);
+      }, delay);
+    } else {
+      setImgError(true);
+    }
+  };
+
+  const handleManualRefresh = () => {
+    if (!imgSrc && !imageUrl) return;
+    const base = (imgSrc || imageUrl || "").split("&_r=")[0];
+    const manualRetry = Date.now() % 10000; // unique bust
+    const sep = base.includes("?") ? "&" : "?";
+    setImgSrc(`${base}${sep}_r=${manualRetry}`);
+    setImgLoaded(false);
+    setImgError(false);
+    retryCountRef.current = 0;
+  };
+
+  const difficultyColor =
+    menu.difficulty === "Facile"
+      ? "text-success"
+      : menu.difficulty === "Difficile"
+        ? "text-chart-4"
+        : "text-chart-2";
+
+  const typeConfig: Record<string, { emoji: string; label: string; bg: string; text: string }> = {
+    "peu calorique": { emoji: "🥗", label: "Léger & Régime", bg: "bg-emerald-950/60", text: "text-emerald-400" },
+    "sport":         { emoji: "💪", label: "Sport & Énergie", bg: "bg-blue-950/60",    text: "text-blue-400" },
+    "gourmande":     { emoji: "🍫", label: "Gourmand",        bg: "bg-amber-950/60",   text: "text-amber-400" },
+  };
+  const typeKey = (menu.type || "").toLowerCase();
+  const typeInfo = typeConfig[typeKey];
+
+  return (
+    <div className="card-premium rounded-2xl border border-white/8 bg-card overflow-hidden" style={{boxShadow: "0 4px 24px oklch(0 0 0 / 40%)"}}>
+      {/* Image */}
+      <div className="aspect-[16/10] bg-muted relative overflow-hidden">
+        {imgSrc && !imgError && (
+          <img
+            src={imgSrc}
+            alt={menu.name}
+            className={`w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0 absolute"}`}
+            onLoad={() => { setImgLoaded(true); onImageLoaded?.(); }}
+            onError={handleImgError}
+          />
+        )}
+        {(!imgSrc || !imgLoaded || imgError) && (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <div className="text-3xl animate-pulse">
+              {["🥗", "💪", "🍫"][index % 3]}
+            </div>
+            <p className="text-xs text-muted-foreground font-medium">
+              📸 Génération de la photo…
+            </p>
+            <div className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="size-1.5 rounded-full bg-primary/40 animate-pulse"
+                  style={{ animationDelay: `${i * 0.3}s` }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Type badge overlaid on image */}
+        {typeInfo && (
+          <div className={`absolute top-2 left-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm ${typeInfo.bg} ${typeInfo.text}`}>
+            <span>{typeInfo.emoji}</span>
+            <span>{typeInfo.label}</span>
+          </div>
+        )}
+        {/* Manual refresh button — always accessible, bottom-right corner */}
+        <button
+          onClick={(e) => { e.stopPropagation(); handleManualRefresh(); }}
+          title="Regénérer l'image"
+          className="absolute bottom-2 right-2 size-7 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/70 transition-all duration-200 opacity-60 hover:opacity-100"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M8 16H3v5"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 space-y-3">
+        <div>
+          <h3 className="text-lg font-bold leading-tight">{menu.name}</h3>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+            {menu.description}
+          </p>
+        </div>
+
+        {/* Meta badges */}
+        <div className="flex flex-wrap gap-2 text-xs font-medium">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary">
+            <Clock className="size-3 text-chart-3" />
+            {menu.cookingTime}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary ${difficultyColor}`}
+          >
+            <Flame className="size-3" />
+            {menu.difficulty}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary">
+            <Users className="size-3 text-chart-5" />
+            {menu.servings} pers.
+          </span>
+          {menu.calories != null && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary text-chart-2 font-semibold">
+              🔥 {menu.calories} kcal
+            </span>
+          )}
+        </div>
+
+        {/* Expandable recipe */}
+        {isExpanded && (
+          <div className="space-y-4 pt-2 border-t border-border/50 animate-fade-in-up">
+            {/* Ingredients */}
+            <div>
+              <h4 className="text-sm font-bold flex items-center gap-1.5 mb-2">
+                <span className="text-base">🥕</span> Ingrédients
+              </h4>
+              <ul className="space-y-1">
+                {menu.ingredients.map((ing) => (
+                  <li
+                    key={ing}
+                    className="text-sm text-muted-foreground flex items-start gap-2"
+                  >
+                    <span className="text-primary mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
+                    {ing}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Steps */}
+            <div>
+              <h4 className="text-sm font-bold flex items-center gap-1.5 mb-2">
+                <span className="text-base">📝</span> Préparation
+              </h4>
+              <ol className="space-y-2">
+                {menu.steps.map((step, i) => (
+                  <li key={step} className="flex items-start gap-3 text-sm">
+                    <span className="shrink-0 size-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center mt-0.5">
+                      {i + 1}
+                    </span>
+                    <span className="text-muted-foreground leading-relaxed">
+                      {step}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* Extras — optional ingredients to buy (with Amazon affiliate links) */}
+            {menu.extras && menu.extras.length > 0 && (
+              <div className="bg-chart-2/10 rounded-xl p-3">
+                <h4 className="text-sm font-bold flex items-center gap-1.5 mb-2 text-chart-2">
+                  <ShoppingCart className="size-4" />
+                  Pour aller plus loin (optionnel)
+                </h4>
+                <ul className="space-y-1.5">
+                  {menu.extras.map((extra) => {
+                    // Extract just the ingredient name (remove quantity/unit prefix like "1 c.à.s de ")
+                    const ingredientName = extra
+                      .replace(/^\d+[\s,.]*(g|kg|cl|ml|L|c\.à\.s|c\.à\.c|cuillère[s]?[^\s]*|pincée[s]?|filet|poignée[s]?|tranche[s]?|morceau[x]?)?\s+(de\s+|d['']\s*)?/i, "")
+                      .trim();
+                    // Amazon affiliate search URL (tag to be replaced with real affiliate ID)
+                    const amazonUrl = `https://www.amazon.fr/s?k=${encodeURIComponent(ingredientName)}&tag=onmangequoi-21`;
+                    return (
+                      <li
+                        key={extra}
+                        className="text-sm flex items-center gap-2"
+                      >
+                        <span className="text-chart-2 mt-0.5 shrink-0">+</span>
+                        <span className="text-muted-foreground flex-1">{extra}</span>
+                        <a
+                          href={amazonUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FF9900]/15 hover:bg-[#FF9900]/30 text-[#FF9900] text-xs font-semibold transition-colors"
+                          title={`Acheter sur Amazon`}
+                        >
+                          🛒 Amazon
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-xs text-muted-foreground/50 mt-2">
+                  * Liens affiliés Amazon — tu soutiens l'app sans frais supplémentaires
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Toggle button */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full flex items-center justify-center gap-1.5 py-2 text-sm font-semibold text-primary hover:text-primary/80 transition"
+        >
+          {isExpanded ? (
+            <>
+              Masquer la recette <ChevronUp className="size-4" />
+            </>
+          ) : (
+            <>
+              Voir la recette <ChevronDown className="size-4" />
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}

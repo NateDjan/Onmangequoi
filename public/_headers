@@ -1,0 +1,4 @@
+# Cache fingerprinted assets for 1 year (immutable — content hash changes on every build)
+# index.html is intentionally NOT listed here so it stays revalidated (no-cache).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
