@@ -4,3 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Netlify sets NODE_ENV=production by default → npm install skips devDependencies
+  # (vite, typescript, tailwind etc are all devDeps → build fails with exit 2)
+  # Force install of devDeps so the build tools are available:
+  NPM_FLAGS = "--include=dev"
