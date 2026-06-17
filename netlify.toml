@@ -1,7 +1,5 @@
 [build]
-  # Use npm (always available) + npx vite + node scripts (no bun needed)
-  # tsc skipped deliberately — vite/esbuild handles TS transpilation without strict checking
-  command = "npm install && npx vite build && node scripts/inline-critical-css.mjs && node scripts/generate-seo-pages.mjs"
+  command = "./node_modules/.bin/vite build && node scripts/inline-critical-css.mjs && node scripts/generate-seo-pages.mjs"
   publish = "dist"
 
 [build.environment]
