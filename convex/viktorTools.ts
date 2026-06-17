@@ -877,7 +877,7 @@ export const quickAiSearch = action({
 // from Convex using fal.ai (with Pollinations.ai as free fallback).
 //
 // Usage:
-//   curl -X POST https://tame-cardinal-281.convex.cloud/api/action \
+//   curl -X POST https://acoustic-camel-417.eu-west-1.convex.cloud/api/action \
 //     -H 'Content-Type: application/json' \
 //     -d '{"path": "viktorTools:retryPendingImages", "args": {}}'
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1013,7 +1013,7 @@ export const retryPendingImages = action({
 //     Static file takes precedence over _redirects catch-all.
 //
 // Usage:
-//   curl -X POST https://tame-cardinal-281.convex.cloud/api/action \
+//   curl -X POST https://acoustic-camel-417.eu-west-1.convex.cloud/api/action \
 //     -H 'Content-Type: application/json' \
 //     -d '{"path": "viktorTools:regenerateSeoPages", "args": {}}'
 // ──────────────────────────────────────────────────────────────────────────────
