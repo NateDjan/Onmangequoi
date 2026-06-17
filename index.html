@@ -92,6 +92,11 @@
     }
     </script>
 
+    <!-- Preload hero image (above-the-fold critical resource) -->
+    <link rel="preload" as="image" href="/hero-default.webp" fetchpriority="high"
+          imagesrcset="/hero-default-400.webp 400w, /hero-default.webp 800w"
+          imagesizes="(max-width: 480px) 400px, 800px" />
+
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4947224241575125"
             crossorigin="anonymous"></script>
@@ -115,11 +120,51 @@
   <body>
     <!-- Static content for search engine indexability (SPA renders over this) -->
     <div id="root">
-      <div style="display:none" aria-hidden="true">
-        <h1>On mange quoi ? — Recettes IA depuis ton frigo</h1>
-        <p>Prends en photo ton frigo ou ton placard et l'IA te propose des recettes et menus personnalisés en quelques secondes. Tes repas de la semaine générés automatiquement selon ce que tu as chez toi.</p>
-        <p>Idées repas du soir, recettes avec les ingrédients que j'ai, que manger ce soir — la solution gratuite pour ne plus jamais manquer d'inspiration culinaire.</p>
-        <a href="/recettes">Voir toutes les recettes</a>
+      <!-- SSR shell: above-the-fold hero visible before React hydrates (eliminates blank screen / FCP) -->
+      <!-- React will hydrate over this; keep class names in sync with HeroSection in HomePage.tsx -->
+      <div id="ssr-shell" style="min-height:100dvh;display:flex;flex-direction:column">
+        <!-- Header stub (same height as sticky header: h-14 = 56px) -->
+        <header style="height:56px;border-bottom:1px solid rgba(0,0,0,.08);backdrop-filter:blur(12px);background:rgba(248,245,240,.85);position:sticky;top:0;z-index:50"></header>
+        <!-- Main content -->
+        <main style="flex:1;display:flex;flex-direction:column">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem">
+            <div style="width:100%;max-width:28rem">
+              <!-- Hero image card — matches rounded-3xl, 220px, gradient overlay -->
+              <div style="position:relative;border-radius:1.5rem;overflow:hidden;height:220px;margin-bottom:0.25rem">
+                <picture>
+                  <source
+                    srcset="/hero-default-400.webp 400w, /hero-default.webp 800w"
+                    sizes="(max-width:480px) 400px, 800px"
+                    type="image/webp" />
+                  <img
+                    src="/hero-default.webp"
+                    alt="On mange quoi ? — Plat du jour"
+                    width="800" height="600"
+                    fetchpriority="high"
+                    decoding="async"
+                    style="width:100%;height:100%;object-fit:cover;object-position:center 40%" />
+                </picture>
+                <!-- Gradient overlay -->
+                <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.20) 0%,rgba(0,0,0,.30) 50%,rgba(0,0,0,.80) 100%)"></div>
+                <!-- Title + subtitle -->
+                <div style="position:absolute;bottom:0;left:0;right:0;padding:1.25rem;text-align:center">
+                  <h1 style="font-size:1.875rem;font-weight:700;letter-spacing:-.025em;color:#f5c842;text-shadow:0 2px 8px rgba(0,0,0,.6);margin:0">
+                    On mange quoi&nbsp;?
+                  </h1>
+                  <p style="color:rgba(255,255,255,.80);font-size:.875rem;margin:.25rem 0 0;text-shadow:0 1px 4px rgba(0,0,0,.5)">
+                    Photo du frigo, ticket de caisse ou dis-moi tes ingrédients
+                  </p>
+                </div>
+              </div>
+              <!-- SEO text (hidden, kept for crawlers) -->
+              <div style="display:none" aria-hidden="true">
+                <p>Prends en photo ton frigo ou ton placard et l'IA te propose des recettes et menus personnalisés en quelques secondes. Tes repas de la semaine générés automatiquement selon ce que tu as chez toi.</p>
+                <p>Idées repas du soir, recettes avec les ingrédients que j'ai, que manger ce soir — la solution gratuite pour ne plus jamais manquer d'inspiration culinaire.</p>
+                <a href="/recettes">Voir toutes les recettes</a>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

@@ -18,6 +18,10 @@ if ("serviceWorker" in navigator) {
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
+// Remove SSR hero shell once React takes over — avoids flash of both
+const ssrShell = document.getElementById("ssr-shell");
+if (ssrShell) ssrShell.remove();
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ConvexAuthProvider client={convex}>
