@@ -1079,10 +1079,45 @@ function InputSection({
   const heroImage = useQuery(api.heroImage.getCurrent);
   // Self-hosted WebP (800px, <80 KB) — used as default until Convex resolves
   const FALLBACK_HERO = "/hero-default.webp";
-  const heroSrc = heroImage?.imageUrl ?? FALLBACK_HERO;
-  const heroDishName = heroImage?.dishName;
+
+  // Today in Paris ("YYYY-MM-DD") — same keying the cron uses for the hero row.
+  const parisToday = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+
+  // Seed synchronously from the last hero we cached *for today*, so a returning
+  // visitor sees today's photo immediately — no flash of the default and never a
+  // previous day's image (a stale-dated cache is ignored, falling back to default).
+  const [cachedHero, setCachedHero] = useState<{ imageUrl: string; dishName?: string } | null>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("omq_hero_v1") || "null");
+      return saved?.imageUrl && saved.date === parisToday()
+        ? { imageUrl: saved.imageUrl, dishName: saved.dishName }
+        : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Persist the daily hero (with its own date) once Convex resolves it.
+  useEffect(() => {
+    if (!heroImage?.imageUrl) return;
+    setCachedHero({ imageUrl: heroImage.imageUrl, dishName: heroImage.dishName });
+    try {
+      localStorage.setItem(
+        "omq_hero_v1",
+        JSON.stringify({ date: heroImage.date, imageUrl: heroImage.imageUrl, dishName: heroImage.dishName }),
+      );
+    } catch {
+      /* ignore quota / private-mode write errors */
+    }
+  }, [heroImage?.imageUrl, heroImage?.dishName, heroImage?.date]);
+
+  // Live query wins; while it loads, use today's cached image instead of the default.
+  const resolved = heroImage?.imageUrl ? heroImage : cachedHero;
+  const heroSrc = resolved?.imageUrl ?? FALLBACK_HERO;
+  const heroDishName = resolved?.dishName;
   // Flag: is the hero still the local default (= preloaded by <link rel=preload>)?
-  const isDefaultHero = !heroImage?.imageUrl;
+  const isDefaultHero = !resolved?.imageUrl;
 
   return (
     <div className="flex-1 flex flex-col items-center px-4 py-8 md:py-12 animate-fade-in-up">
