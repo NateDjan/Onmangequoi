@@ -1123,7 +1123,7 @@ function InputSection({
     <div className="flex-1 flex flex-col items-center px-4 py-8 md:py-12 animate-fade-in-up">
       <div className="w-full max-w-md space-y-5">
         {/* Hero — food photo with gradient overlay */}
-        <div className="relative rounded-3xl overflow-hidden mb-1" style={{height: '220px'}}>
+        <div className="relative rounded-3xl overflow-hidden mb-1" style={{height: '220px', backgroundColor: '#1a0f0a'}}>
           {isDefaultHero ? (
             /* Default hero — self-hosted WebP, already preloaded by <link rel=preload> */
             <picture>
@@ -1150,9 +1150,8 @@ function InputSection({
               alt={heroDishName ?? "Plat du jour"}
               fetchPriority="high"
               decoding="async"
-              className="w-full h-full object-cover opacity-0 transition-opacity duration-500 ease-out"
+              className="w-full h-full object-cover"
               style={{objectPosition: 'center 40%'}}
-              onLoad={(e) => { e.currentTarget.style.opacity = '1'; }}
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80" />
