@@ -1150,8 +1150,9 @@ function InputSection({
               alt={heroDishName ?? "Plat du jour"}
               fetchPriority="high"
               decoding="async"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover opacity-0 transition-opacity duration-500 ease-out"
               style={{objectPosition: 'center 40%'}}
+              onLoad={(e) => { e.currentTarget.style.opacity = '1'; }}
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80" />

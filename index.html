@@ -3,6 +3,40 @@
   <head>
     <meta charset="UTF-8" />
 
+    <!-- Theme init (blocking, runs before first paint) — resolves dark/light from
+         the user's stored choice or system preference and applies it to <html>
+         BEFORE the SSR shell paints. Kills the light→dark flash on launch. -->
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem("omq-theme-mode");
+          var dark =
+            m === "dark" ||
+            ((m === "system" || !m) &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? "#1a0f0a" : "#f8f5f0");
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Shell theming — paints the pre-React shell in the resolved theme so there
+         is no light flash before hydration. Inline so it applies immediately. -->
+    <style>
+      html { background: #f8f5f0; }
+      html.dark { background: #1a0f0a; }
+      .ssr-header {
+        background: rgba(248, 245, 240, 0.85);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      html.dark .ssr-header {
+        background: rgba(26, 15, 10, 0.85);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+    </style>
+
     <!-- Google Analytics (single init, SPA config handled in React) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-LNY16C49XG"></script>
     <script>
@@ -124,7 +158,7 @@
       <!-- React will hydrate over this; keep class names in sync with HeroSection in HomePage.tsx -->
       <div id="ssr-shell" style="min-height:100dvh;display:flex;flex-direction:column">
         <!-- Header stub (same height as sticky header: h-14 = 56px) -->
-        <header style="height:56px;border-bottom:1px solid rgba(0,0,0,.08);backdrop-filter:blur(12px);background:rgba(248,245,240,.85);position:sticky;top:0;z-index:50"></header>
+        <header class="ssr-header" style="height:56px;backdrop-filter:blur(12px);position:sticky;top:0;z-index:50"></header>
         <!-- Main content -->
         <main style="flex:1;display:flex;flex-direction:column">
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem">

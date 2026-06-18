@@ -2,3 +2,7 @@
 # index.html is intentionally NOT listed here so it stays revalidated (no-cache).
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Service worker must always revalidate so version bumps reach clients immediately.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
