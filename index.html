@@ -131,18 +131,12 @@
           imagesrcset="/hero-default-400.webp 400w, /hero-default.webp 800w"
           imagesizes="(max-width: 480px) 400px, 800px" />
 
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4947224241575125"
-            crossorigin="anonymous"></script>
-
-    <!-- AdSense navigation exclusion zones -->
-    <!-- Elements with data-noads="true" are excluded from Auto Ads placement -->
+    <!-- Google AdSense: intentionally NOT loaded on the app shell.
+         AdSense policy forbids ads on tool/utility screens without publisher
+         content (home "on mange quoi" generator, results, loading screens).
+         The ad unit is loaded ONLY on editorial recipe pages
+         (static /recette/{slug}/ pages, see scripts/generate-seo-pages.mjs). -->
     <style>
-      /* Prevent Auto Ads from injecting inside navigation elements */
-      [data-noads="true"] ins.adsbygoogle,
-      [data-noads="true"] .adsbygoogle {
-        display: none !important;
-      }
       /* Ensure clear visual separation around affiliate links */
       .affiliate-section {
         border-top: 1px solid rgba(255,255,255,0.06);

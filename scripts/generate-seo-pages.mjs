@@ -86,6 +86,8 @@ function generateHtml(recipe) {
   <meta property="og:url" content="${canonical}">
   <meta property="og:image" content="${esc(ogImage)}">
   <meta property="og:type" content="article">
+  <!-- Google AdSense — loaded only on editorial recipe pages (publisher content) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4947224241575125" crossorigin="anonymous"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
