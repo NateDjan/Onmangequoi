@@ -32,11 +32,6 @@ function esc(text) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function escj(text) {
-  return String(text ?? "")
-    .replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n").replace(/\r/g, "");
-}
 
 // ── Generate HTML ─────────────────────────────────────────────────────────────
 
@@ -53,18 +48,58 @@ function generateHtml(recipe) {
 
   const canonical = `https://onmangequoi.net/recette/${slug}`;
   const ogImage = imageUrl || FALLBACK_OG_IMAGE;
-  const jsonldImage = imageUrl ? `,\n    "image": "${escj(imageUrl)}"` : "";
 
   const heroImg = imageUrl
     ? `<div class="hero-img-wrap"><img src="${esc(imageUrl)}" alt="${esc(name)}" class="hero-img" loading="eager" /></div>`
     : `<div class="hero-img-placeholder">&#x1F37D;</div>`;
 
   const ingredientsHtml = ingredients.map(i => `<li>${esc(i)}</li>`).join("\n");
-  const stepsHtml = steps.map(s => `<li>${esc(s)}</li>`).join("\n");
-  const instructionsJson = JSON.stringify(
-    steps.map((s, i) => ({ "@type": "HowToStep", position: i + 1, text: s }))
-  );
-  const ingredientsJson = JSON.stringify(ingredients);
+  const stepsHtml = steps.map((s, i) => `<li id="etape-${i + 1}">${esc(s)}</li>`).join("\n");
+
+  // ── Structured data (schema.org/Recipe) — enriched for recipe rich results ────
+  const isoDuration = (txt) => {
+    const m = String(txt ?? "").match(/\d+/);
+    return m ? `PT${m[0]}M` : "";
+  };
+  const recipeCategory = (() => {
+    const n = `${name} ${description}`.toLowerCase();
+    if (/soupe|velout|potage/.test(n)) return "Soupe";
+    if (/salade/.test(n)) return "Entrée";
+    // High precision on Dessert: a sweet signal AND no savory marker. A savory dish must
+    // never be mislabeled Dessert; under-labeling a dessert as "Plat principal" is harmless.
+    const savory = /poulet|poule|b[œo]euf|veau|porc|jambon|bacon|lardon|chorizo|merguez|saucisse|dinde|canard|agneau|poisson|saumon|thon|cabillaud|sardine|anchois|maquereau|crevette|moule|calamar|oeuf|œuf|omelette|quiche|fromage|ch[èe]vre|comt[ée]|parmesan|mozzarella|feta|gruy[èe]re|ricotta|burrata|gratin|risotto|gnocchi|p[âa]tes|nouille|riz|quinoa|boulgour|semoule|lentille|pois|haricot|courgette|aubergine|poireau|carotte|tomate|oignon|[ée]chalote|champignon|[ée]pinard|brocoli|chou|potiron|potimarron|patate|pomme de terre|betterave|poivron|curry|tajine|wok|po[êe]l[ée]e|fricass[ée]e|blanquette|mijot|r[ôo]ti|sal[ée]|moutarde/;
+    const sweet = /dessert|g[âa]teau|tarte|cr[êe]pe|mousse|cookie|brownie|chocolat|sucr|compote|p[âa]tisserie|glace|sorbet|clafouti|tiramisu|panna|cheesecake|muffin|gaufre|crumble|banana bread/;
+    if (sweet.test(n) && !savory.test(n)) return "Dessert";
+    return "Plat principal";
+  })();
+  const cookIso = isoDuration(cookingTime);
+
+  const recipeSchema = {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    name,
+    description,
+    url: canonical,
+    author: { "@type": "Organization", name: "On mange quoi ?", url: "https://onmangequoi.net" },
+    recipeCategory,
+    recipeIngredient: ingredients,
+    recipeInstructions: steps.map((s, i) => {
+      const step = {
+        "@type": "HowToStep",
+        position: i + 1,
+        name: `Étape ${i + 1}`,
+        text: s,
+        url: `${canonical}#etape-${i + 1}`,
+      };
+      if (imageUrl) step.image = imageUrl;
+      return step;
+    }),
+  };
+  if (imageUrl) recipeSchema.image = imageUrl;
+  if (cookIso) { recipeSchema.cookTime = cookIso; recipeSchema.totalTime = cookIso; }
+  if (servings) recipeSchema.recipeYield = String(servings);
+  if (recipe.recipeType) recipeSchema.keywords = String(recipe.recipeType);
+  const recipeJsonLd = JSON.stringify(recipeSchema, null, 2);
 
   const metaParts = [];
   if (cookingTime) metaParts.push(`&#x23F1; ${cookingTime}`);
@@ -89,16 +124,7 @@ function generateHtml(recipe) {
   <!-- Google AdSense — loaded only on editorial recipe pages (publisher content) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4947224241575125" crossorigin="anonymous"></script>
   <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Recipe",
-    "name": "${escj(name)}",
-    "description": "${escj(description)}",
-    "url": "${canonical}",
-    "author": {"@type": "Organization", "name": "On mange quoi ?", "url": "https://onmangequoi.net"},
-    "recipeIngredient": ${ingredientsJson},
-    "recipeInstructions": ${instructionsJson}${jsonldImage}
-  }
+${recipeJsonLd}
   </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
