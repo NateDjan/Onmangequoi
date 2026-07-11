@@ -1005,6 +1005,92 @@ export function HomePage() {
           }}
         /></Suspense>
       )}
+
+      {/* ─── SEO / Editorial content section ─── */}
+      {phase === "input" && (
+        <section className="w-full max-w-md mx-auto px-4 py-10 mt-4 space-y-8 border-t border-border/30">
+          <div className="space-y-3 text-center">
+            <h2 className="text-lg font-bold text-foreground">
+              {lang === "fr" ? "Comment ça marche ?" : "How does it work?"}
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {lang === "fr"
+                ? "On Mange Quoi ? est une application gratuite qui analyse le contenu de ton frigo grâce à l'intelligence artificielle et te propose des recettes personnalisées en quelques secondes. Prends en photo tes ingrédients, ton ticket de caisse ou dis-nous simplement ce que tu as chez toi — l'IA s'occupe du reste."
+                : "On Mange Quoi? is a free app that analyzes your fridge contents with AI and suggests personalized recipes in seconds. Take a photo of your ingredients, your grocery receipt, or just tell us what you have at home — the AI handles the rest."}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              {
+                icon: "📸",
+                title: lang === "fr" ? "Prends une photo" : "Take a photo",
+                desc: lang === "fr"
+                  ? "Photo du frigo, du placard ou d'un ticket de caisse — l'IA détecte automatiquement tous les ingrédients présents."
+                  : "Fridge, pantry or grocery receipt — the AI automatically detects all the ingredients.",
+              },
+              {
+                icon: "🤖",
+                title: lang === "fr" ? "L'IA génère des recettes" : "AI generates recipes",
+                desc: lang === "fr"
+                  ? "En quelques secondes, tu reçois 3 idées de recettes adaptées à ce que tu as, avec ingrédients, étapes et temps de cuisson."
+                  : "In seconds you receive 3 recipe ideas adapted to what you have, with ingredients, steps and cooking time.",
+              },
+              {
+                icon: "🍽️",
+                title: lang === "fr" ? "Mange bien, sans gâchis" : "Eat well, no waste",
+                desc: lang === "fr"
+                  ? "Plus d'ingrédients oubliés au fond du frigo. On Mange Quoi ? t'aide à cuisiner malin et à réduire le gaspillage alimentaire."
+                  : "No more forgotten ingredients at the back of the fridge. On Mange Quoi? helps you cook smart and reduce food waste.",
+              },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="flex gap-4 rounded-2xl bg-muted/40 px-4 py-4">
+                <span className="text-2xl shrink-0 mt-0.5">{icon}</span>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-foreground">{title}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* FAQ */}
+          <div className="space-y-4">
+            <h3 className="text-base font-bold text-foreground">
+              {lang === "fr" ? "Questions fréquentes" : "Frequently asked questions"}
+            </h3>
+            {(lang === "fr" ? [
+              { q: "Est-ce que l'application est gratuite ?", a: "Oui, On Mange Quoi ? est gratuit. Un plan premium est disponible pour des générations illimitées et des fonctionnalités avancées comme la planification de menus à la semaine." },
+              { q: "Quels types de recettes l'IA peut-elle générer ?", a: "L'IA peut générer tout type de recette : rapide (moins de 30 minutes), végétarienne, sportive, légère, gourmande ou comfort food, selon tes préférences et tes contraintes alimentaires." },
+              { q: "Mes photos sont-elles stockées ?", a: "Non, les photos sont analysées en temps réel et ne sont pas conservées sur nos serveurs. Seules les recettes générées peuvent être sauvegardées dans ton historique si tu as un compte." },
+              { q: "Comment générer un menu pour toute la semaine ?", a: "Sélectionne le mode 'Menu de la semaine' depuis l'interface principale. L'IA génère un planning complet (déjeuner + dîner) pour 5 ou 7 jours à partir de tes ingrédients." },
+            ] : [
+              { q: "Is the app free?", a: "Yes, On Mange Quoi? is free. A premium plan is available for unlimited generations and advanced features like weekly meal planning." },
+              { q: "What types of recipes can the AI generate?", a: "The AI can generate any type of recipe: quick (under 30 minutes), vegetarian, high-protein, light, indulgent or comfort food, based on your preferences and dietary constraints." },
+              { q: "Are my photos stored?", a: "No, photos are analyzed in real time and are not stored on our servers. Only generated recipes can be saved to your history if you have an account." },
+              { q: "How do I generate a full week's menu?", a: "Select 'Weekly meal plan' mode from the main interface. The AI generates a complete schedule (lunch + dinner) for 5 or 7 days based on your ingredients." },
+            ]).map(({ q, a }) => (
+              <div key={q} className="space-y-1.5">
+                <p className="text-sm font-semibold text-foreground">{q}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-xs text-muted-foreground/60 pb-4">
+            {lang === "fr"
+              ? "Découvrez aussi nos "
+              : "Also discover our "}
+            <a href="/recettes" className="underline text-muted-foreground hover:text-primary transition">
+              {lang === "fr" ? "recettes IA" : "AI recipes"}
+            </a>
+            {lang === "fr" ? " et notre " : " and our "}
+            <a href="/blog" className="underline text-muted-foreground hover:text-primary transition">
+              {lang === "fr" ? "blog cuisine" : "cooking blog"}
+            </a>
+          </p>
+        </section>
+      )}
     </div>
   );
 }

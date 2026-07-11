@@ -56,9 +56,23 @@ export default function BlogPage() {
       {/* Blog content */}
       <main className="max-w-5xl mx-auto px-4 py-12">
         <h1 className="text-4xl font-bold text-foreground mb-2">{t("blog_title")}</h1>
-        <p className="text-muted-foreground mb-10 text-lg">
+        <p className="text-muted-foreground mb-6 text-lg">
           {t("blog_subtitle")}
         </p>
+
+        {/* Editorial intro */}
+        <div className="prose prose-neutral max-w-none mb-10 space-y-4 text-foreground/80 text-base leading-relaxed">
+          <p>
+            {lang === "fr"
+              ? "Bienvenue sur le blog On Mange Quoi ? — votre ressource pour cuisiner malin, éviter le gaspillage alimentaire et trouver l'inspiration culinaire au quotidien. Nos articles couvrent les recettes IA générées depuis de vrais frigos, les astuces pour cuisiner avec les restes, la nutrition équilibrée et la planification des repas de la semaine."
+              : "Welcome to the On Mange Quoi? blog — your resource for smart cooking, reducing food waste, and finding daily culinary inspiration. Our articles cover AI-generated recipes from real fridges, tips for cooking with leftovers, balanced nutrition, and weekly meal planning."}
+          </p>
+          <p>
+            {lang === "fr"
+              ? "Chaque semaine, nous publions des guides pratiques, des idées de menus équilibrés et des analyses nutritionnelles pour vous aider à manger mieux sans vous prendre la tête. Que vous ayez 10 minutes ou 1 heure devant vous, On Mange Quoi ? a une recette adaptée à votre frigo et à votre emploi du temps."
+              : "Every week we publish practical guides, balanced meal ideas, and nutritional insights to help you eat better without the hassle. Whether you have 10 minutes or an hour, On Mange Quoi? has a recipe adapted to your fridge and your schedule."}
+          </p>
+        </div>
 
         {/* Soro AI embed container */}
         <div id="soro-blog"></div>

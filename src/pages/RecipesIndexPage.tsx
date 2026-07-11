@@ -17,7 +17,7 @@ export function RecipesIndexPage() {
   }, [lang]);
 
   return (
-    <div className="min-h-screen bg-background" data-noads="true">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-surface-border">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
