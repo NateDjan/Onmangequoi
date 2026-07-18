@@ -21,7 +21,7 @@ import json, re, hashlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-IMAGE_LOG_PATH = Path("/work/viktor-spaces/on-mange-quoi/meta-automation/image_log.json")
+from shared_config import IMAGE_LOG_PATH
 DEDUP_DAYS = 30  # Never repeat within this many days
 
 

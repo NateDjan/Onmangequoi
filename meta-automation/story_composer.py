@@ -34,10 +34,31 @@ def _strip_emoji(text: str) -> str:
     """Remove emoji characters that Lato can't render (avoids ? glyphs)."""
     return _EMOJI_RE.sub("", text).strip()
 
-FONT_BLACK  = "/usr/share/fonts/truetype/lato/Lato-Black.ttf"
-FONT_BOLD   = "/usr/share/fonts/truetype/lato/Lato-Bold.ttf"
-FONT_REGULAR = "/usr/share/fonts/truetype/lato/Lato-Regular.ttf"
-FONT_SEMI   = "/usr/share/fonts/truetype/lato/Lato-Semibold.ttf"
+# Font paths — try system Lato first, fall back to user fonts, then system fonts
+import os as _os
+_LATO_DIRS = [
+    "/usr/share/fonts/truetype/lato",
+    _os.path.expanduser("~/.local/share/fonts/truetype/lato"),
+    "/opt/data/home/.local/share/fonts/truetype/lato",
+]
+_FALLBACK_DIRS = [
+    "/usr/share/fonts/truetype/liberation",
+    "/usr/share/fonts/truetype/dejavu",
+]
+
+def _find_font(filenames: list[str]) -> str:
+    for d in _LATO_DIRS + _FALLBACK_DIRS:
+        for fn in filenames:
+            p = _os.path.join(d, fn)
+            if _os.path.isfile(p):
+                return p
+    raise FileNotFoundError(f"Cannot find any of {filenames} in {_LATO_DIRS + _FALLBACK_DIRS}")
+
+# Try Lato variants, fall back to Liberation Sans for missing weights
+FONT_BLACK  = _find_font(["Lato-Black.ttf", "LiberationSans-Bold.ttf"])
+FONT_BOLD   = _find_font(["Lato-Bold.ttf", "LiberationSans-Bold.ttf"])
+FONT_REGULAR = _find_font(["Lato-Regular.ttf", "LiberationSans-Regular.ttf", "DejaVuSans.ttf"])
+FONT_SEMI   = _find_font(["Lato-Semibold.ttf", "Lato-Bold.ttf", "LiberationSans-Bold.ttf"])
 
 W, H = 1080, 1920  # 9:16
 

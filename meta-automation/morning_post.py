@@ -7,4 +7,7 @@ from datetime import datetime
 pillar = "gourmand" if datetime.now().day % 2 == 0 else "leger"
 print(f"Morning post → {pillar} (day {datetime.now().day})")
 sys.argv = ['morning_post.py', '--pillar', pillar]
-exec(open('/work/viktor-spaces/on-mange-quoi/meta-automation/daily_post.py').read())
+
+# Use relative path
+import runpy
+runpy.run_path(os.path.join(os.path.dirname(__file__), 'daily_post.py'), run_name='__main__')

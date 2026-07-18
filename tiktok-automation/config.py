@@ -1,9 +1,10 @@
-"""TikTok automation config loader."""
+"""TikTok automation config loader — uses relative paths."""
 import json
 from pathlib import Path
 
-CONFIG_PATH = Path("/work/viktor-spaces/on-mange-quoi/meta-automation/config.json")
-TOKEN_PATH = Path("/work/viktor-spaces/on-mange-quoi/tiktok-automation/tiktok_tokens.json")
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = _REPO_ROOT / "meta-automation" / "config.json"
+TOKEN_PATH = Path(__file__).resolve().parent / "tiktok_tokens.json"
 
 def load_config() -> dict:
     return json.loads(CONFIG_PATH.read_text())

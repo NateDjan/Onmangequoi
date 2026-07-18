@@ -14,8 +14,6 @@ Usage:
 import asyncio, hashlib, os, sys, urllib.parse, traceback
 from pathlib import Path
 
-sys.path.insert(0, "/work")
-
 FAL_KEY = "17bcb4c4-5cb9-4d73-9388-fca3d3df4d8d:48c41bc54ce90d8b27a3dcad90d5e5d8"
 
 
@@ -111,9 +109,9 @@ async def _generate_pollinations(prompt: str, width: int, height: int, suffix: s
     raise RuntimeError("Pollinations: all 3 attempts failed (rate-limited)")
 
 
-async def _generate_coworker(prompt: str, width: int, height: int, suffix: str) -> tuple[str, str]:
-    """Fallback 2: coworker_text2im via SDK (always available)."""
-    from sdk.tools.utils_tools import coworker_text2im
+async def _generate_hermes(prompt: str, width: int, height: int, suffix: str) -> tuple[str, str]:
+    """Fallback 2: Hermes bridge (text2im via LLM)."""
+    from hermes_bridge import text2im
 
     # Determine aspect ratio
     ratio = width / height
@@ -124,27 +122,17 @@ async def _generate_coworker(prompt: str, width: int, height: int, suffix: str) 
     else:
         aspect = "2:3"
 
-    # Use gemini-flash-image (faster, less artifacts for food photos)
-    result = await coworker_text2im(
+    result = await asyncio.to_thread(
+        text2im,
         prompt=prompt,
         model="gemini-flash-image",
         aspect_ratio=aspect,
     )
 
-    if result and result.file_path:
-        return result.file_path, getattr(result, "url", None)
+    if result and result.get("local_path"):
+        return result["local_path"], result.get("url")
 
-    # Try gpt-image-2 as last resort
-    result = await coworker_text2im(
-        prompt=prompt,
-        model="gpt-image-2",
-        aspect_ratio=aspect,
-    )
-
-    if result and result.file_path:
-        return result.file_path, getattr(result, "url", None)
-
-    raise RuntimeError("coworker_text2im: both models failed")
+    raise RuntimeError("hermes text2im: failed")
 
 
 async def generate_image(
@@ -163,7 +151,7 @@ async def generate_image(
     providers = [
         ("fal.ai", _generate_fal),
         ("Pollinations", _generate_pollinations),
-        ("coworker_text2im", _generate_coworker),
+        ("Hermes", _generate_hermes),
     ]
 
     last_error = None
