@@ -197,6 +197,98 @@ ${recipeJsonLd}
 </html>`;
 }
 
+// ── Recipe index page (/recettes/) ─────────────────────────────────────────────
+
+function generateIndexHtml(recipes) {
+  const cards = recipes.map(r => {
+    const slug = r.slug ?? "";
+    const name = esc(r.name ?? "");
+    const description = esc(r.description ?? "").substring(0, 120);
+    const imageUrl = r.imageUrl ?? "";
+    const tags = (r.ingredients ?? []).slice(0, 4).map(i => esc(i.toLowerCase()));
+
+    const imageHtml = imageUrl
+      ? `<img src="${esc(imageUrl)}" alt="${name}" class="card-img" loading="lazy" />`
+      : `<div class="card-emoji">🍽️</div>`;
+
+    const tagsHtml = tags.map(t => `<span class="tag">${t}</span>`).join("");
+
+    return `<a href="/recette/${slug}" class="recipe-card">
+      <div class="card-thumb">${imageHtml}</div>
+      <h2>${name}</h2>
+      <p>${description}...</p>
+      <div class="tags">${tagsHtml}</div>
+    </a>`;
+  }).join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recettes faciles avec vos ingrédients | On mange quoi ?</title>
+  <meta name="description" content="Trouvez des recettes avec les ingrédients que vous avez dans votre frigo. ${recipes.length}+ recettes faciles et rapides, de la soupe au dessert.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://onmangequoi.net/recettes/">
+  <meta property="og:title" content="Recettes faciles avec vos ingrédients | On mange quoi ?">
+  <meta property="og:description" content="Trouvez des recettes avec les ingrédients que vous avez dans votre frigo. ${recipes.length}+ recettes faciles et rapides.">
+  <meta property="og:url" content="https://onmangequoi.net/recettes/">
+  <meta property="og:type" content="website">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Recettes faciles avec vos ingrédients",
+    "description": "${recipes.length}+ recettes classées par ingrédients pour cuisiner avec ce que vous avez.",
+    "url": "https://onmangequoi.net/recettes/",
+    "author": {"@type": "Organization", "name": "On mange quoi ?"}
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fdf8f4; color: #2d1a0e; }
+    header { background: linear-gradient(135deg, #1a0f0a, #3d1f0d); padding: 1rem 2rem; }
+    header a { color: white; text-decoration: none; font-weight: bold; font-size: 1.2rem; }
+    .hero { background: linear-gradient(135deg, #3d1f0d, #6b3a1f); color: white; padding: 3rem 2rem; text-align: center; }
+    .hero h1 { font-size: 2.2rem; margin-bottom: 1rem; }
+    .hero p { font-size: 1.15rem; opacity: 0.9; max-width: 600px; margin: 0 auto 1.5rem; }
+    .btn { display: inline-block; background: #f5a623; color: white; padding: 0.9rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 1.1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+    .recipe-card { background: white; border-radius: 16px; text-decoration: none; color: inherit; box-shadow: 0 2px 12px rgba(0,0,0,0.08); transition: transform 0.2s; overflow: hidden; display: flex; flex-direction: column; }
+    .recipe-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .card-thumb { aspect-ratio: 16/10; overflow: hidden; background: linear-gradient(135deg, #fdf0e8, #fdf8f4); }
+    .card-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+    .recipe-card:hover .card-img { transform: scale(1.05); }
+    .card-emoji { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+    .recipe-card h2 { color: #c45c1a; font-size: 1rem; margin: 0; padding: 1rem 1.25rem 0.25rem; line-height: 1.4; }
+    .recipe-card p { color: #666; font-size: 0.85rem; line-height: 1.5; padding: 0.25rem 1.25rem 0.5rem; }
+    .tags { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0 1.25rem 1.25rem; margin-top: auto; }
+    .tag { background: #fdf0e8; color: #c45c1a; border-radius: 12px; padding: 0.2rem 0.6rem; font-size: 0.78rem; }
+    footer { text-align: center; padding: 2rem; color: #888; font-size: 0.85rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="https://onmangequoi.net">🍽️ On mange quoi ?</a>
+  </header>
+
+  <div class="hero">
+    <h1>🥘 Toutes nos recettes</h1>
+    <p>Des recettes faciles classées par ingrédients. Ou laissez l'IA composer un plat avec ce que vous avez dans votre frigo !</p>
+    <a href="https://onmangequoi.net" class="btn">📸 Prendre une photo de mon frigo</a>
+  </div>
+
+  <div class="grid">
+${cards}
+  </div>
+
+  <footer>
+    <p>© 2026 <a href="https://onmangequoi.net" style="color:#c45c1a">On mange quoi ?</a> — Application de recettes IA gratuite</p>
+  </footer>
+</body>
+</html>`;
+}
+
 // ── Sitemap ───────────────────────────────────────────────────────────────────
 
 function buildSitemap(recipes) {
@@ -239,6 +331,12 @@ for (const recipe of recipes) {
 }
 console.log(`✅ ${generated} recipe pages generated in dist/recette/`);
 if (noImage.length) console.log(`⚠️  ${noImage.length} recipes without image (fallback OG used)`);
+
+// Generate /recettes/index.html (recipe index with images)
+const recettesDir = join(DIST, "recettes");
+mkdirSync(recettesDir, { recursive: true });
+writeFileSync(join(recettesDir, "index.html"), generateIndexHtml(recipes), "utf-8");
+console.log(`✅ Recipe index page generated (${recipes.length} recipes with images)`);
 
 // Update sitemap
 const sitemap = buildSitemap(recipes);

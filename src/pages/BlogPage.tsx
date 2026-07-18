@@ -18,9 +18,43 @@ export default function BlogPage() {
       document.body.appendChild(script);
     }
 
+    // Inject dark mode overrides for Soro embed
+    // Soro uses hardcoded #1a1a1a text which is invisible on the site's dark bg (#1a0f0a)
+    const darkStyle = document.createElement("style");
+    darkStyle.id = "soro-dark-override";
+    darkStyle.textContent = `
+      .dark .soro-blog,
+      .dark .soro-blog * {
+        color: #f0ebe4 !important;
+      }
+      .dark .soro-blog-card {
+        border-color: rgba(255,255,255,0.12) !important;
+      }
+      .dark .soro-blog-card:hover {
+        border-color: rgba(255,255,255,0.2) !important;
+      }
+      .dark .soro-blog-back {
+        border-color: rgba(255,255,255,0.15) !important;
+        color: #ccc !important;
+      }
+      .dark .soro-blog-back:hover {
+        background: rgba(255,255,255,0.08) !important;
+      }
+      .dark .soro-blog-spinner {
+        border-color: rgba(255,255,255,0.12) !important;
+        border-top-color: #f0ebe4 !important;
+      }
+      .dark .soro-blog-article-content a {
+        color: #f5a623 !important;
+      }
+    `;
+    document.head.appendChild(darkStyle);
+
     return () => {
       const s = document.querySelector('script[src*="trysoro.com"]');
       if (s) s.remove();
+      const ds = document.getElementById("soro-dark-override");
+      if (ds) ds.remove();
     };
   }, []);
 
