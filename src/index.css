@@ -267,7 +267,13 @@
     .container {
       padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 640px;
+      max-width: 1024px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container {
+      max-width: 1152px;
     }
   }
 

@@ -888,7 +888,7 @@ export function HomePage() {
       {/* Navigation bar */}
       {canGoBack && (
         <nav className="sticky top-14 z-40 bg-background/80 backdrop-blur-md border-b border-border/30" data-noads="true">
-          <div className="flex items-center h-11 px-4 max-w-md mx-auto">
+          <div className="flex items-center h-11 px-4 max-w-md lg:max-w-6xl mx-auto">
             <button
               type="button"
               onClick={goBack}
@@ -1008,7 +1008,7 @@ export function HomePage() {
 
       {/* ─── SEO / Editorial content section ─── */}
       {phase === "input" && (
-        <section className="w-full max-w-md mx-auto px-4 py-10 mt-4 space-y-8 border-t border-border/30">
+        <section className="w-full max-w-md lg:max-w-4xl mx-auto px-4 py-10 mt-4 space-y-8 border-t border-border/30">
           <div className="space-y-3 text-center">
             <h2 className="text-lg font-bold text-foreground">
               {lang === "fr" ? "Comment ça marche ?" : "How does it work?"}
@@ -1020,7 +1020,7 @@ export function HomePage() {
             </p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4">
             {[
               {
                 icon: "📸",
@@ -1170,14 +1170,24 @@ function InputSection({
   const parisToday = () =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
 
+  // Daily hero pillar labels — the type rotates every day (set by the cron)
+  const PILLAR_LABEL: Record<string, { fr: string; en: string; emoji: string }> = {
+    leger:    { fr: "Léger",    en: "Light",   emoji: "🥗" },
+    sport:    { fr: "Sport",    en: "Sport",   emoji: "💪" },
+    gourmand: { fr: "Gourmand", en: "Gourmet", emoji: "🍽️" },
+    dessert:  { fr: "Dessert",  en: "Dessert", emoji: "🍮" },
+    exotique: { fr: "Exotique", en: "Exotic",  emoji: "🌍" },
+    comfort:  { fr: "Réconfort", en: "Comfort", emoji: "🍲" },
+  };
+
   // Seed synchronously from the last hero we cached *for today*, so a returning
   // visitor sees today's photo immediately — no flash of the default and never a
   // previous day's image (a stale-dated cache is ignored, falling back to default).
-  const [cachedHero, setCachedHero] = useState<{ imageUrl: string; dishName?: string } | null>(() => {
+  const [cachedHero, setCachedHero] = useState<{ imageUrl: string; dishName?: string; pillar?: string } | null>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("omq_hero_v1") || "null");
       return saved?.imageUrl && saved.date === parisToday()
-        ? { imageUrl: saved.imageUrl, dishName: saved.dishName }
+        ? { imageUrl: saved.imageUrl, dishName: saved.dishName, pillar: saved.pillar }
         : null;
     } catch {
       return null;
@@ -1187,29 +1197,30 @@ function InputSection({
   // Persist the daily hero (with its own date) once Convex resolves it.
   useEffect(() => {
     if (!heroImage?.imageUrl) return;
-    setCachedHero({ imageUrl: heroImage.imageUrl, dishName: heroImage.dishName });
+    setCachedHero({ imageUrl: heroImage.imageUrl, dishName: heroImage.dishName, pillar: heroImage.pillar });
     try {
       localStorage.setItem(
         "omq_hero_v1",
-        JSON.stringify({ date: heroImage.date, imageUrl: heroImage.imageUrl, dishName: heroImage.dishName }),
+        JSON.stringify({ date: heroImage.date, imageUrl: heroImage.imageUrl, dishName: heroImage.dishName, pillar: heroImage.pillar }),
       );
     } catch {
       /* ignore quota / private-mode write errors */
     }
-  }, [heroImage?.imageUrl, heroImage?.dishName, heroImage?.date]);
+  }, [heroImage?.imageUrl, heroImage?.dishName, heroImage?.date, heroImage?.pillar]);
 
   // Live query wins; while it loads, use today's cached image instead of the default.
   const resolved = heroImage?.imageUrl ? heroImage : cachedHero;
   const heroSrc = resolved?.imageUrl ?? FALLBACK_HERO;
   const heroDishName = resolved?.dishName;
+  const heroPillar = resolved?.pillar ? PILLAR_LABEL[resolved.pillar] : undefined;
   // Flag: is the hero still the local default (= preloaded by <link rel=preload>)?
   const isDefaultHero = !resolved?.imageUrl;
 
   return (
     <div className="flex-1 flex flex-col items-center px-4 py-8 md:py-12 animate-fade-in-up">
-      <div className="w-full max-w-md space-y-5">
-        {/* Hero — food photo with gradient overlay */}
-        <div className="relative rounded-3xl overflow-hidden mb-1" style={{height: '220px', backgroundColor: '#1a0f0a'}}>
+      <div className="w-full max-w-md lg:max-w-6xl space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:items-start">
+        {/* Hero — food photo with gradient overlay (left column on desktop) */}
+        <div className="relative rounded-3xl overflow-hidden mb-1 lg:mb-0 h-[220px] lg:h-[430px]" style={{backgroundColor: '#1a0f0a'}}>
           {isDefaultHero ? (
             /* Default hero — self-hosted WebP, already preloaded by <link rel=preload> */
             <picture>
@@ -1220,7 +1231,7 @@ function InputSection({
               />
               <img
                 src="/hero-default.webp"
-                alt="Plat du jour"
+                alt="Menu du jour"
                 width={800}
                 height={600}
                 fetchPriority="high"
@@ -1233,7 +1244,7 @@ function InputSection({
             /* Daily hero from Convex — load with high priority too */
             <img
               src={heroSrc}
-              alt={heroDishName ?? "Plat du jour"}
+              alt={heroDishName ?? "Menu du jour"}
               fetchPriority="high"
               decoding="async"
               className="w-full h-full object-cover"
@@ -1244,7 +1255,9 @@ function InputSection({
           {/* Daily dish name badge — top right */}
           {heroDishName && (
             <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1">
-              <span className="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Plat du jour</span>
+              <span className="text-[10px] font-semibold text-white/70 uppercase tracking-wide">
+                Menu du jour{heroPillar ? ` · ${heroPillar.emoji} ${lang === "fr" ? heroPillar.fr : heroPillar.en}` : ""}
+              </span>
             </div>
           )}
           <div className="absolute bottom-0 inset-x-0 p-5 text-center">
@@ -1260,6 +1273,9 @@ function InputSection({
             )}
           </div>
         </div>
+
+        {/* Right column on desktop — all input controls (stacked below hero on mobile) */}
+        <div className="space-y-5 lg:pt-1">
 
         {/* ── Multi-photo grid ── */}
         {photos.length > 0 && (
@@ -1606,6 +1622,7 @@ function InputSection({
         <p className="text-center text-xs text-muted-foreground/70">
           {lang === "fr" ? "📸 Photo du frigo ou 🧾 ticket de caisse = l'IA détecte tes produits • ✍️ Texte = tu les décris" : "📸 Fridge photo or 🧾 grocery receipt = AI detects your products • ✍️ Text = describe them"}
         </p>
+        </div>
       </div>
     </div>
   );
