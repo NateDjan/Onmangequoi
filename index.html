@@ -17,7 +17,7 @@
               window.matchMedia("(prefers-color-scheme: dark)").matches);
           if (dark) document.documentElement.classList.add("dark");
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute("content", dark ? "#1a0f0a" : "#f8f5f0");
+          if (meta) meta.setAttribute("content", dark ? "#1a0f0a" : "#fbf7f0");
         } catch (e) {}
       })();
     </script>
@@ -25,10 +25,10 @@
     <!-- Shell theming — paints the pre-React shell in the resolved theme so there
          is no light flash before hydration. Inline so it applies immediately. -->
     <style>
-      html { background: #f8f5f0; }
+      html { background: #fbf7f0; }
       html.dark { background: #1a0f0a; }
       .ssr-header {
-        background: rgba(248, 245, 240, 0.85);
+        background: rgba(251, 247, 240, 0.85);
         border-bottom: 1px solid rgba(0, 0, 0, 0.08);
       }
       html.dark .ssr-header {
@@ -53,6 +53,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>On mange quoi ?</title>
 
+    <!-- Éditorial Lumière fonts: Fraunces (display serif) + Inter (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
 
@@ -63,8 +68,8 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!-- Theme color (dynamically updated by ThemeContext) -->
-    <meta name="theme-color" content="#f8f5f0" />
-    <meta name="msapplication-TileColor" content="#f8f5f0" />
+    <meta name="theme-color" content="#fbf7f0" />
+    <meta name="msapplication-TileColor" content="#fbf7f0" />
 
     <!-- Google Search Console Verification -->
     <meta name="google-site-verification" content="2WQBOYDqaeACBD2rfxoH8JGTbQTGW_fTir3sKCKnpCc" />
@@ -176,7 +181,7 @@
                 <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.20) 0%,rgba(0,0,0,.30) 50%,rgba(0,0,0,.80) 100%)"></div>
                 <!-- Title + subtitle -->
                 <div style="position:absolute;bottom:0;left:0;right:0;padding:1.25rem;text-align:center">
-                  <h1 style="font-size:1.875rem;font-weight:700;letter-spacing:-.025em;color:#f5c842;text-shadow:0 2px 8px rgba(0,0,0,.6);margin:0">
+                  <h1 style="font-family:'Fraunces',Georgia,serif;font-size:1.875rem;font-weight:700;letter-spacing:-.025em;color:#fdf9f3;text-shadow:0 2px 8px rgba(0,0,0,.6);margin:0">
                     On mange quoi&nbsp;?
                   </h1>
                   <p style="color:rgba(255,255,255,.80);font-size:.875rem;margin:.25rem 0 0;text-shadow:0 1px 4px rgba(0,0,0,.5)">

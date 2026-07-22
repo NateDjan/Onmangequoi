@@ -69,7 +69,7 @@ export function Header() {
               variant="ghost"
               size="sm"
               onClick={() => navigate("/pricing")}
-              className="gap-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 h-9 px-2.5"
+              className="gap-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:text-amber-300 dark:hover:bg-amber-400/10 h-9 px-2.5"
               title="Pro"
             >
               <Sparkles className="size-4" />

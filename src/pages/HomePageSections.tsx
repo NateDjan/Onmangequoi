@@ -900,9 +900,9 @@ export function MenuCard({
         : "text-chart-2";
 
   const typeConfig: Record<string, { emoji: string; label: string; bg: string; text: string }> = {
-    "peu calorique": { emoji: "🥗", label: "Léger & Régime", bg: "bg-emerald-950/60", text: "text-emerald-400" },
-    "sport":         { emoji: "💪", label: "Sport & Énergie", bg: "bg-blue-950/60",    text: "text-blue-400" },
-    "gourmande":     { emoji: "🍫", label: "Gourmand",        bg: "bg-amber-950/60",   text: "text-amber-400" },
+    "peu calorique": { emoji: "🥗", label: "Léger & Régime", bg: "bg-emerald-500/15 dark:bg-emerald-950/60", text: "text-emerald-700 dark:text-emerald-400" },
+    "sport":         { emoji: "💪", label: "Sport & Énergie", bg: "bg-blue-500/15 dark:bg-blue-950/60",    text: "text-blue-700 dark:text-blue-400" },
+    "gourmande":     { emoji: "🍫", label: "Gourmand",        bg: "bg-amber-500/15 dark:bg-amber-950/60",   text: "text-amber-700 dark:text-amber-400" },
   };
   const typeKey = (menu.type || "").toLowerCase();
   const typeInfo = typeConfig[typeKey];

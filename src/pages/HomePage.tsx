@@ -1248,7 +1248,7 @@ function InputSection({
             </div>
           )}
           <div className="absolute bottom-0 inset-x-0 p-5 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gold drop-shadow-lg">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#fdf9f3] drop-shadow-lg">
               {t("appName")}
             </h1>
             {heroDishName ? (

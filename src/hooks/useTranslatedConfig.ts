@@ -14,10 +14,10 @@ export function useTranslatedConfig() {
 
   return useMemo(() => {
     const RECIPE_TYPE_CONFIG: Record<RecipeTypeKey, { label: string; emoji: string; desc: string; color: string }> = {
-      classique: { label: t("recipeType_classique"), emoji: "🍽️", desc: t("recipeType_classique_desc"), color: "text-orange-400 border-orange-400/40 bg-orange-950/30" },
-      allege:    { label: t("recipeType_allege"),    emoji: "🥗", desc: t("recipeType_allege_desc"),    color: "text-green-400 border-green-400/40 bg-green-950/30" },
-      sport:     { label: t("recipeType_sport"),     emoji: "💪", desc: t("recipeType_sport_desc"),     color: "text-blue-400 border-blue-400/40 bg-blue-950/30" },
-      gourmand:  { label: t("recipeType_gourmand"),  emoji: "🍫", desc: t("recipeType_gourmand_desc"),  color: "text-amber-400 border-amber-400/40 bg-amber-950/30" },
+      classique: { label: t("recipeType_classique"), emoji: "🍽️", desc: t("recipeType_classique_desc"), color: "text-orange-700 border-orange-600/40 bg-orange-500/15 dark:text-orange-400 dark:border-orange-400/40 dark:bg-orange-950/30" },
+      allege:    { label: t("recipeType_allege"),    emoji: "🥗", desc: t("recipeType_allege_desc"),    color: "text-green-700 border-green-600/40 bg-green-500/15 dark:text-green-400 dark:border-green-400/40 dark:bg-green-950/30" },
+      sport:     { label: t("recipeType_sport"),     emoji: "💪", desc: t("recipeType_sport_desc"),     color: "text-blue-700 border-blue-600/40 bg-blue-500/15 dark:text-blue-400 dark:border-blue-400/40 dark:bg-blue-950/30" },
+      gourmand:  { label: t("recipeType_gourmand"),  emoji: "🍫", desc: t("recipeType_gourmand_desc"),  color: "text-amber-700 border-amber-600/40 bg-amber-500/15 dark:text-amber-400 dark:border-amber-400/40 dark:bg-amber-950/30" },
     };
 
     const PLAN_MODE_CONFIG: Record<PlanMode, { label: string; emoji: string; desc: string }> = {

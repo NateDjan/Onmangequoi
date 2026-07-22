@@ -42,7 +42,7 @@ function applyTheme(resolved: ResolvedTheme) {
   // Update meta theme-color for mobile browsers
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute("content", resolved === "dark" ? "#1a0f0a" : "#f8f5f0");
+    meta.setAttribute("content", resolved === "dark" ? "#1a0f0a" : "#fbf7f0");
   }
 }
 
