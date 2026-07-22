@@ -54,7 +54,7 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "light",
   switchable = true,
 }: ThemeProviderProps) {
   const [mode, setModeState] = useState<ThemeMode>(() => {

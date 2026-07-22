@@ -10,9 +10,11 @@
       (function () {
         try {
           var m = localStorage.getItem("omq-theme-mode");
+          // Default = LIGHT (Éditorial Lumière). Dark only when the user explicitly
+          // chose "dark", or chose "system" AND the device prefers dark.
           var dark =
             m === "dark" ||
-            ((m === "system" || !m) &&
+            (m === "system" &&
               window.matchMedia &&
               window.matchMedia("(prefers-color-scheme: dark)").matches);
           if (dark) document.documentElement.classList.add("dark");
@@ -170,7 +172,7 @@
                     sizes="(max-width:480px) 400px, 800px"
                     type="image/webp" />
                   <img
-                    src="/hero-default.webp"
+                    src="/hero-default.jpg"
                     alt="On mange quoi ? — Menu du jour"
                     width="800" height="600"
                     fetchpriority="high"

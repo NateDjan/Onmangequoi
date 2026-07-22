@@ -1230,7 +1230,7 @@ function InputSection({
                 type="image/webp"
               />
               <img
-                src="/hero-default.webp"
+                src="/hero-default.jpg"
                 alt="Menu du jour"
                 width={800}
                 height={600}
