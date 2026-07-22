@@ -29,7 +29,7 @@ function StatCard({
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
     green: "bg-green-500/10 text-green-500",
-    amber: "bg-amber-500/10 text-amber-500",
+    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     blue: "bg-blue-500/10 text-blue-500",
   };
   return (
@@ -48,10 +48,10 @@ function StatCard({
 
 function ProviderBadge({ provider }: { provider: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    password: { label: "Email", cls: "bg-slate-500/10 text-slate-400" },
-    google: { label: "Google", cls: "bg-red-500/10 text-red-400" },
+    password: { label: "Email", cls: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
+    google: { label: "Google", cls: "bg-red-500/10 text-red-600 dark:text-red-400" },
     apple: { label: "Apple", cls: "bg-gray-500/10 text-gray-300" },
-    "microsoft-entra-id": { label: "Microsoft", cls: "bg-blue-500/10 text-blue-400" },
+    "microsoft-entra-id": { label: "Microsoft", cls: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
   };
   const { label, cls } = map[provider] ?? { label: provider, cls: "bg-muted text-muted-foreground" };
   return (
@@ -213,7 +213,7 @@ export function AdminPage() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         {user.plan === "pro" ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
                             <Crown className="size-3" /> Pro
                           </span>
                         ) : (
@@ -225,7 +225,7 @@ export function AdminPage() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         {user.recentUsage > 0 ? (
-                          <span className="text-xs font-semibold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-md">
+                          <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-md">
                             {user.recentUsage}
                           </span>
                         ) : (

@@ -240,9 +240,9 @@ export function HistoryPage() {
                             <div className="p-3 space-y-2">
                               {menu.type && (() => {
                                 const typeConfig: Record<string, { emoji: string; label: string; bg: string; text: string }> = {
-                                  "peu calorique": { emoji: "🥗", label: lang === "fr" ? "Léger & Régime" : "Light & Diet", bg: "bg-emerald-50", text: "text-emerald-700" },
-                                  "sport":         { emoji: "💪", label: lang === "fr" ? "Sport & Énergie" : "Sport & Energy", bg: "bg-blue-50",    text: "text-blue-700" },
-                                  "gourmande":     { emoji: "🍫", label: lang === "fr" ? "Gourmand" : "Gourmet",        bg: "bg-amber-50",   text: "text-amber-700" },
+                                  "peu calorique": { emoji: "🥗", label: lang === "fr" ? "Léger & Régime" : "Light & Diet", bg: "bg-emerald-50 dark:bg-emerald-950/50", text: "text-emerald-700 dark:text-emerald-400" },
+                                  "sport":         { emoji: "💪", label: lang === "fr" ? "Sport & Énergie" : "Sport & Energy", bg: "bg-blue-50 dark:bg-blue-950/50",    text: "text-blue-700 dark:text-blue-400" },
+                                  "gourmande":     { emoji: "🍫", label: lang === "fr" ? "Gourmand" : "Gourmet",        bg: "bg-amber-50 dark:bg-amber-950/50",   text: "text-amber-700 dark:text-amber-400" },
                                 };
                                 const info = typeConfig[(menu.type as string).toLowerCase()];
                                 return info ? (

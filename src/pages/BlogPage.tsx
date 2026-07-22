@@ -45,7 +45,10 @@ export default function BlogPage() {
         border-top-color: #f0ebe4 !important;
       }
       .dark .soro-blog-article-content a {
-        color: #f5a623 !important;
+        color: #e2a077 !important;
+      }
+      .soro-blog-article-content a {
+        color: #c14a2e !important;
       }
     `;
     document.head.appendChild(darkStyle);
