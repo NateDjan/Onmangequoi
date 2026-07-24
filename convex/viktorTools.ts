@@ -34,6 +34,187 @@ async function callTool<T>(role: string, args: Record<string, unknown> = {}): Pr
   return json.result as T;
 }
 
+// ── fal.ai any-llm fallback (bypasses Viktor/Gemini quota) ─────────────────
+const FAL_LLM_URL = "https://fal.run/fal-ai/any-llm";
+const FAL_KEY_VALUE =
+  process.env.FAL_KEY ??
+  "17bcb4c4-5cb9-4d73-9388-fca3d3df4d8d:48c41bc54ce90d8b27a3dcad90d5e5d8";
+const FAL_LLM_MODELS = [
+  "openai/gpt-4o-mini",
+  "anthropic/claude-3.5-sonnet",
+  "meta-llama/llama-3.2-3b-instruct",
+];
+
+function schemaKeysFromOutputSchema(outputSchema: {
+  type?: string;
+  properties?: Record<string, unknown>;
+}): string[] {
+  return Object.keys(outputSchema?.properties ?? {});
+}
+
+function coerceJsonValue(raw: string): Record<string, unknown> {
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error("Fallback LLM: no JSON object in response");
+  }
+  const parsed = JSON.parse(match[0]) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Fallback LLM: JSON root is not an object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+async function callFalStructured(
+  prompt: string,
+  inputText: string,
+  outputSchema: { type?: string; properties?: Record<string, unknown> },
+): Promise<Record<string, unknown>> {
+  const keys = schemaKeysFromOutputSchema(outputSchema);
+  const keyHints = keys
+    .map((k) => {
+      const prop = (outputSchema.properties?.[k] ?? {}) as {
+        type?: string;
+        items?: { type?: string };
+        description?: string;
+      };
+      const t = prop.type ?? "string";
+      if (t === "array") return `${k} (array of strings)`;
+      if (t === "integer" || t === "number") return `${k} (integer)`;
+      return `${k} (string)`;
+    })
+    .join(", ");
+
+  const fullPrompt = `${prompt}
+
+DONNÉES UTILISATEUR :
+${inputText}
+
+FORMAT DE RÉPONSE — OBLIGATOIRE :
+- Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de texte hors JSON).
+- L'objet DOIT contenir EXACTEMENT ces clés : ${keyHints || "(voir le schéma fourni)"}.
+- Les tableaux (ingredients, steps, extras) sont des arrays de strings.
+- servings et calories sont des entiers.`;
+
+  let lastErr: unknown = null;
+  for (const model of FAL_LLM_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 55_000);
+      let response: Response;
+      try {
+        response = await fetch(FAL_LLM_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Key ${FAL_KEY_VALUE}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            prompt: fullPrompt,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`fal LLM HTTP ${response.status}: ${body.slice(0, 300)}`);
+      }
+      const data = (await response.json()) as {
+        output?: string;
+        error?: string | null;
+      };
+      if (data.error) throw new Error(String(data.error));
+      const out = (data.output ?? "").trim();
+      if (!out) throw new Error(`fal LLM empty output (model=${model})`);
+      return coerceJsonValue(out);
+    } catch (e) {
+      lastErr = e;
+      console.error(`[fal-llm-fallback] model=${model} failed:`, e);
+    }
+  }
+  throw new Error(
+    `Fallback LLM failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  );
+}
+
+/**
+ * Prefer fal.ai any-llm (works while Gemini/Viktor monthly cap is exhausted).
+ * Optionally try Viktor first when OMQ_AI_PRIMARY=viktor is set.
+ */
+async function callStructuredAI(args: {
+  prompt: string;
+  input_text: string;
+  output_schema: { type?: string; properties?: Record<string, unknown> };
+  intelligence_level?: string;
+}): Promise<{ result: Record<string, unknown> | null; error: string | null }> {
+  const preferViktor = process.env.OMQ_AI_PRIMARY === "viktor";
+
+  const tryViktor = async () => {
+    const aiResponse = await callTool<{
+      result: Record<string, unknown> | null;
+      error: string | null;
+    }>("ai_structured_output", {
+      prompt: args.prompt,
+      output_schema: args.output_schema,
+      input_text: args.input_text,
+      intelligence_level: args.intelligence_level ?? "balanced",
+    });
+    if (!aiResponse.error && aiResponse.result) {
+      return aiResponse;
+    }
+    throw new Error(aiResponse.error ?? "Viktor returned empty result");
+  };
+
+  const tryFal = async () => {
+    const result = await callFalStructured(
+      args.prompt,
+      args.input_text,
+      args.output_schema,
+    );
+    return { result, error: null as string | null };
+  };
+
+  if (preferViktor) {
+    try {
+      return await tryViktor();
+    } catch (e) {
+      console.error(
+        "[structured-ai] Viktor failed, falling back to fal:",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    try {
+      return await tryFal();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { result: null, error: msg };
+    }
+  }
+
+  // Default: fal first (Gemini quota currently blocks Viktor path)
+  try {
+    return await tryFal();
+  } catch (e) {
+    console.error(
+      "[structured-ai] fal failed, trying Viktor:",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+  try {
+    return await tryViktor();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { result: null, error: msg };
+  }
+}
+
 // ──────────────────────────────────────────────
 // Menu Suggestion — AI generates 3 recipe ideas
 // Uses flat schema because ai_structured_output
@@ -244,10 +425,7 @@ export const suggestMenus = action({
           properties: makeRecipeSchema("recipe1"),
         };
 
-        const aiResponse = await callTool<{
-          result: Record<string, unknown> | null;
-          error: string | null;
-        }>("ai_structured_output", {
+        const aiResponse = await callStructuredAI({
           prompt,
           output_schema: outputSchema,
           input_text: inputText,
@@ -332,10 +510,7 @@ export const suggestMenus = action({
         ),
       };
 
-      const aiResponse = await callTool<{
-        result: Record<string, unknown> | null;
-        error: string | null;
-      }>("ai_structured_output", {
+      const aiResponse = await callStructuredAI({
         prompt,
         output_schema: outputSchema,
         input_text: inputText,
@@ -458,10 +633,7 @@ Pour chaque créneau (ex: slot_lun_soir), fournis :
       properties: makeWeeklySchema(slots),
     };
 
-    const aiResponse = await callTool<{
-      result: Record<string, unknown> | null;
-      error: string | null;
-    }>("ai_structured_output", {
+    const aiResponse = await callStructuredAI({
       prompt,
       output_schema: outputSchema,
       input_text: inputText,
@@ -530,7 +702,6 @@ interface FoodItem {
 
 // ── fal.ai vision: fast, direct, no agent startup ──────────────────────────
 const FAL_VISION_URL = "https://fal.run/fal-ai/any-llm/vision";
-const FAL_KEY_VALUE = "17bcb4c4-5cb9-4d73-9388-fca3d3df4d8d:48c41bc54ce90d8b27a3dcad90d5e5d8";
 
 async function analyzeFoodImage(imageUrl: string): Promise<FoodItem[]> {
   const prompt = `Tu es un expert en reconnaissance d'aliments et en lecture de tickets de caisse / reçus de supermarché. Analyse cette image et identifie TOUS les produits alimentaires.
