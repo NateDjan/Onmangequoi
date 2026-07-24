@@ -1,40 +1,14 @@
 /**
- * Viktor Tools - AI-powered food/recipe features
+ * AI-powered food/recipe features — fal.ai only (Viktor out of the loop).
+ * Hermes redirects all generation through fal for menus, vision & images.
  */
 import { v } from "convex/values";
-import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalAction } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 
 declare const process: { env: Record<string, string | undefined> };
 
-const VIKTOR_API_URL = process.env.VIKTOR_SPACES_API_URL!;
-const PROJECT_NAME = process.env.VIKTOR_SPACES_PROJECT_NAME!;
-const PROJECT_SECRET = process.env.VIKTOR_SPACES_PROJECT_SECRET!;
-
-async function callTool<T>(role: string, args: Record<string, unknown> = {}): Promise<T> {
-  const response = await fetch(`${VIKTOR_API_URL}/api/viktor-spaces/tools/call`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      project_name: PROJECT_NAME,
-      project_secret: PROJECT_SECRET,
-      role,
-      arguments: args,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-
-  const json = await response.json();
-  if (!json.success) {
-    throw new Error(json.error ?? "Tool call failed");
-  }
-  return json.result as T;
-}
-
-// ── fal.ai any-llm fallback (bypasses Viktor/Gemini quota) ─────────────────
+// ── fal.ai any-llm (menus, search, structured recipes) ─────────────────────
 const FAL_LLM_URL = "https://fal.run/fal-ai/any-llm";
 const FAL_KEY_VALUE =
   process.env.FAL_KEY ??
@@ -145,8 +119,8 @@ FORMAT DE RÉPONSE — OBLIGATOIRE :
 }
 
 /**
- * Prefer fal.ai any-llm (works while Gemini/Viktor monthly cap is exhausted).
- * Optionally try Viktor first when OMQ_AI_PRIMARY=viktor is set.
+ * Structured AI via fal.ai only — Viktor is out of the loop.
+ * Hermes/fal owns all recipe & menu generation.
  */
 async function callStructuredAI(args: {
   prompt: string;
@@ -154,63 +128,16 @@ async function callStructuredAI(args: {
   output_schema: { type?: string; properties?: Record<string, unknown> };
   intelligence_level?: string;
 }): Promise<{ result: Record<string, unknown> | null; error: string | null }> {
-  const preferViktor = process.env.OMQ_AI_PRIMARY === "viktor";
-
-  const tryViktor = async () => {
-    const aiResponse = await callTool<{
-      result: Record<string, unknown> | null;
-      error: string | null;
-    }>("ai_structured_output", {
-      prompt: args.prompt,
-      output_schema: args.output_schema,
-      input_text: args.input_text,
-      intelligence_level: args.intelligence_level ?? "balanced",
-    });
-    if (!aiResponse.error && aiResponse.result) {
-      return aiResponse;
-    }
-    throw new Error(aiResponse.error ?? "Viktor returned empty result");
-  };
-
-  const tryFal = async () => {
+  try {
     const result = await callFalStructured(
       args.prompt,
       args.input_text,
       args.output_schema,
     );
-    return { result, error: null as string | null };
-  };
-
-  if (preferViktor) {
-    try {
-      return await tryViktor();
-    } catch (e) {
-      console.error(
-        "[structured-ai] Viktor failed, falling back to fal:",
-        e instanceof Error ? e.message : String(e),
-      );
-    }
-    try {
-      return await tryFal();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { result: null, error: msg };
-    }
-  }
-
-  // Default: fal first (Gemini quota currently blocks Viktor path)
-  try {
-    return await tryFal();
-  } catch (e) {
-    console.error(
-      "[structured-ai] fal failed, trying Viktor:",
-      e instanceof Error ? e.message : String(e),
-    );
-  }
-  try {
-    return await tryViktor();
+    return { result, error: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error("[structured-ai] fal-only path failed:", msg);
     return { result: null, error: msg };
   }
 }
@@ -671,21 +598,14 @@ export const getStorageUrl = action({
 });
 
 
-// Trigger the photo analysis cron agent immediately via the Viktor gateway
+// Legacy no-op: photo analysis is done client-side via analyzePhotoDirectly (fal).
+// Kept so old clients calling triggerPhotoAnalysis don't crash.
 export const triggerPhotoAnalysis = action({
   args: {},
   returns: v.object({ triggered: v.boolean() }),
   handler: async () => {
-    try {
-      const result = await callTool<{ status: string }>("trigger_cron", {
-        path: "/on-mange-quoi/photo-analysis",
-      });
-      console.log("Triggered photo analysis cron:", result.status);
-      return { triggered: result.status === "success" };
-    } catch (e) {
-      console.error("Failed to trigger cron:", e);
-      return { triggered: false };
-    }
+    // Viktor cron removed — real path is analyzePhotoDirectly (fal vision).
+    return { triggered: false };
   },
 });
 
@@ -884,11 +804,11 @@ export const fetchAndStoreMenuImages = action({
         jobs: jobsToGenerate,
       });
 
-      // Trigger the image-generation cron immediately
+      // Generate images ourselves via fal (no Viktor cron)
       try {
-        await callTool("trigger_cron", { path: "/on-mange-quoi/image-generation" });
-      } catch (_e) {
-        // Cron trigger is best-effort — it also runs on a schedule
+        await ctx.scheduler.runAfter(0, internal.viktorTools.processPendingImages, {});
+      } catch (e) {
+        console.error("[images] failed to schedule fal image jobs:", e);
       }
     }
 
@@ -1028,30 +948,153 @@ Si tu ne peux pas identifier un plat cuisiné (image floue, non-alimentaire, etc
   },
 });
 
-// Re-export existing tools
+// Quick AI answer via fal (no Viktor)
 export const quickAiSearch = action({
   args: { query: v.string() },
   returns: v.string(),
   handler: async (_ctx, { query }) => {
-    const result = await callTool<{ search_response: string }>("quick_ai_search", {
-      search_question: query,
-    });
-    return result.search_response;
+    const result = await callFalStructured(
+      "Tu es un assistant culinaire. Réponds de façon concise et utile en français.",
+      query,
+      {
+        type: "object",
+        properties: {
+          answer: { type: "string", description: "Réponse courte et utile" },
+        },
+      },
+    );
+    return String(result.answer ?? JSON.stringify(result));
   },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// retryPendingImages — Remote trigger for stuck image jobs
+// Image generation queue — fal.ai + Pollinations (no Viktor)
 //
-// Allows anyone with the Convex URL to unblock image generation without
-// needing access to Viktor's server. Processes ALL pending jobs directly
-// from Convex using fal.ai (with Pollinations.ai as free fallback).
-//
-// Usage:
-//   curl -X POST https://acoustic-camel-417.eu-west-1.convex.cloud/api/action \
-//     -H 'Content-Type: application/json' \
-//     -d '{"path": "viktorTools:retryPendingImages", "args": {}}'
+// processPendingImages  — internalAction, scheduled after fetchAndStoreMenuImages
+// retryPendingImages    — public action (manual unblock / curl)
 // ──────────────────────────────────────────────────────────────────────────────
+async function processPendingImageJobs(ctx: {
+  runQuery: Function;
+  runMutation: Function;
+}): Promise<{
+  processed: number;
+  succeeded: number;
+  failed: number;
+  details: string[];
+}> {
+  const jobs: Array<{
+    _id: string;
+    dishName: string;
+    imagePrompt: string;
+  }> = await ctx.runQuery(api.pendingImages.getPendingJobs, {});
+
+  if (jobs.length === 0) {
+    return { processed: 0, succeeded: 0, failed: 0, details: ["No pending image jobs found"] };
+  }
+
+  const details: string[] = [];
+  let succeeded = 0;
+  let failed = 0;
+
+  const buildPrompt = (dishName: string, imagePrompt: string) =>
+    `Professional food photography, ${dishName}, ${imagePrompt}, beautifully plated, appetizing, restaurant quality, soft natural lighting, shallow depth of field, delicious looking`;
+
+  const FAL_IMAGE_MODEL = "fal-ai/flux/schnell";
+
+  const tryFal = async (dishName: string, imagePrompt: string): Promise<string | null> => {
+    try {
+      const resp = await fetch(`https://fal.run/${FAL_IMAGE_MODEL}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Key ${FAL_KEY_VALUE}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: buildPrompt(dishName, imagePrompt),
+          image_size: { width: 768, height: 768 },
+          num_inference_steps: 4,
+          num_images: 1,
+          enable_safety_checker: false,
+        }),
+      });
+      if (resp.status === 402 || resp.status === 403 || resp.status === 429) return null;
+      if (!resp.ok) return null;
+      const data = (await resp.json()) as { images?: Array<{ url: string }> };
+      return data.images?.[0]?.url ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const tryPollinations = async (dishName: string, imagePrompt: string): Promise<string | null> => {
+    try {
+      const encoded = encodeURIComponent(buildPrompt(dishName, imagePrompt));
+      const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&nologo=true&model=flux`;
+      const resp = await fetch(url);
+      if (resp.ok && resp.headers.get("content-type")?.startsWith("image/")) {
+        return resp.url;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  for (const job of jobs) {
+    try {
+      await ctx.runMutation(api.pendingImages.updateImageJob, {
+        id: job._id as never,
+        status: "processing",
+      });
+
+      let url = await tryFal(job.dishName, job.imagePrompt);
+      let source = "fal";
+      if (!url) {
+        url = await tryPollinations(job.dishName, job.imagePrompt);
+        source = "pollinations";
+      }
+
+      if (url) {
+        await ctx.runMutation(api.pendingImages.updateImageJob, {
+          id: job._id as never,
+          status: "done",
+          imageUrl: url,
+        });
+        await ctx.runMutation(api.dishImages.storeCachedImage, {
+          dishName: job.dishName,
+          imageUrl: url,
+          imagePrompt: job.imagePrompt,
+        });
+        succeeded++;
+        details.push(`✅ [${source}] ${job.dishName}`);
+      } else {
+        await ctx.runMutation(api.pendingImages.updateImageJob, {
+          id: job._id as never,
+          status: "error",
+        });
+        failed++;
+        details.push(`❌ ${job.dishName}: no URL from fal or pollinations`);
+      }
+    } catch (e) {
+      failed++;
+      details.push(`❌ ${job.dishName}: ${e}`);
+    }
+  }
+
+  return { processed: jobs.length, succeeded, failed, details };
+}
+
+export const processPendingImages = internalAction({
+  args: {},
+  returns: v.object({
+    processed: v.number(),
+    succeeded: v.number(),
+    failed: v.number(),
+    details: v.array(v.string()),
+  }),
+  handler: async (ctx) => processPendingImageJobs(ctx),
+});
+
 export const retryPendingImages = action({
   args: {},
   returns: v.object({
@@ -1060,133 +1103,12 @@ export const retryPendingImages = action({
     failed: v.number(),
     details: v.array(v.string()),
   }),
-  handler: async (ctx) => {
-    // Fetch all pending jobs
-    const jobs: Array<{
-      _id: string;
-      dishName: string;
-      imagePrompt: string;
-    }> = await ctx.runQuery(api.pendingImages.getPendingJobs, {});
-
-    if (jobs.length === 0) {
-      return { processed: 0, succeeded: 0, failed: 0, details: ["No pending image jobs found"] };
-    }
-
-    const details: string[] = [];
-    let succeeded = 0;
-    let failed = 0;
-
-    // Helper: build unified food prompt
-    const buildPrompt = (dishName: string, imagePrompt: string) =>
-      `Professional food photography, ${dishName}, ${imagePrompt}, beautifully plated, appetizing, restaurant quality, soft natural lighting, shallow depth of field, delicious looking`;
-
-    const FAL_IMAGE_MODEL = "fal-ai/flux/schnell";
-
-    // Helper: generate via fal.ai
-    const tryFal = async (dishName: string, imagePrompt: string): Promise<string | null> => {
-      try {
-        const resp = await fetch(`https://fal.run/${FAL_IMAGE_MODEL}`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Key ${FAL_KEY_VALUE}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt: buildPrompt(dishName, imagePrompt),
-            image_size: { width: 768, height: 768 },
-            num_inference_steps: 4,
-            num_images: 1,
-            enable_safety_checker: false,
-          }),
-        });
-        if (resp.status === 402 || resp.status === 403 || resp.status === 429) return null;
-        if (!resp.ok) return null;
-        const data = await resp.json() as { images?: Array<{ url: string }> };
-        return data.images?.[0]?.url ?? null;
-      } catch {
-        return null;
-      }
-    };
-
-    // Helper: generate via Pollinations.ai (free fallback)
-    const tryPollinations = async (dishName: string, imagePrompt: string): Promise<string | null> => {
-      try {
-        const encoded = encodeURIComponent(buildPrompt(dishName, imagePrompt));
-        const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&nologo=true&model=flux`;
-        const resp = await fetch(url);
-        if (resp.ok && resp.headers.get("content-type")?.startsWith("image/")) {
-          return resp.url;
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    };
-
-    // Process each job sequentially (Convex actions have fetch limits)
-    for (const job of jobs) {
-      try {
-        // Mark as processing
-        await ctx.runMutation(api.pendingImages.updateImageJob, {
-          id: job._id as never,
-          status: "processing",
-        });
-
-        // Try fal.ai first, fallback to Pollinations
-        let url = await tryFal(job.dishName, job.imagePrompt);
-        let source = "fal";
-        if (!url) {
-          url = await tryPollinations(job.dishName, job.imagePrompt);
-          source = "pollinations";
-        }
-
-        if (url) {
-          await ctx.runMutation(api.pendingImages.updateImageJob, {
-            id: job._id as never,
-            status: "done",
-            imageUrl: url,
-          });
-          // Cache for future users
-          await ctx.runMutation(api.dishImages.storeCachedImage, {
-            dishName: job.dishName,
-            imageUrl: url,
-            imagePrompt: job.imagePrompt,
-          });
-          succeeded++;
-          details.push(`✅ [${source}] ${job.dishName}`);
-        } else {
-          await ctx.runMutation(api.pendingImages.updateImageJob, {
-            id: job._id as never,
-            status: "error",
-          });
-          failed++;
-          details.push(`❌ ${job.dishName}: no URL from fal or pollinations`);
-        }
-      } catch (e) {
-        failed++;
-        details.push(`❌ ${job.dishName}: ${e}`);
-      }
-    }
-
-    return { processed: jobs.length, succeeded, failed, details };
-  },
+  handler: async (ctx) => processPendingImageJobs(ctx),
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// regenerateSeoPages — Rebuild all static recipe pages + sitemap + Netlify deploy
-//
-// Triggers Viktor's cron at /on-mange-quoi/seo-rebuild which runs
-// rebuild_all_seo_pages.py: generates /recette/{slug}/index.html for every recipe
-// (real photo in <img>, og:image, JSON-LD Recipe.image), rebuilds the sitemap
-// for all 70 recipes, and deploys the whole dist/ to Netlify.
-//
-// ⚠️  Route is /recette/{slug}/ (singular) — matches SPA router + sitemap.
-//     Static file takes precedence over _redirects catch-all.
-//
-// Usage:
-//   curl -X POST https://acoustic-camel-417.eu-west-1.convex.cloud/api/action \
-//     -H 'Content-Type: application/json' \
-//     -d '{"path": "viktorTools:regenerateSeoPages", "args": {}}'
+// regenerateSeoPages — SEO rebuild is local (no Viktor)
+//   node scripts/generate-seo-pages.mjs && git push
 // ──────────────────────────────────────────────────────────────────────────────
 export const regenerateSeoPages = action({
   args: {},
@@ -1195,10 +1117,10 @@ export const regenerateSeoPages = action({
     message: v.string(),
   }),
   handler: async (_ctx) => {
-    await callTool("trigger_cron", { path: "/on-mange-quoi/seo-rebuild" });
     return {
-      status: "triggered",
-      message: "SEO page rebuild started. Check onmangequoi.net in ~60s.",
+      status: "manual",
+      message:
+        "SEO rebuild n'utilise plus Viktor. Lance localement: node scripts/generate-seo-pages.mjs puis push.",
     };
   },
 });
