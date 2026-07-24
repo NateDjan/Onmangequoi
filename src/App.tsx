@@ -24,13 +24,9 @@ const PricingPage      = lazy(() => import("./pages/PricingPage").then(m => ({ d
 const AdminPage        = lazy(() => import("./pages/AdminPage").then(m => ({ default: m.AdminPage })));
 const PlazamPage       = lazy(() => import("./pages/PlazamPage").then(m => ({ default: m.PlazamPage })));
 
-// Minimal spinner shown while a lazy chunk loads
+// Invisible hold while a lazy chunk loads — no spinner/hourglass between pages
 function PageFallback() {
-  return (
-    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ opacity: 0.4, fontSize: "1.5rem" }}>⏳</span>
-    </div>
-  );
+  return <div style={{ minHeight: "100dvh" }} aria-hidden="true" />;
 }
 
 function App() {
