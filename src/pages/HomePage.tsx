@@ -619,11 +619,20 @@ export function HomePage() {
           setImageSessionId(res.sessionId);
         }).catch(() => {/* images stay as skeleton on error */});
       }
-    } catch (_err) {
-      setError(t("genericError"));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err ?? "");
+      const isQuota =
+        /429|spending cap|quota|rate limit|resource_exhausted/i.test(raw);
+      setError(
+        isQuota
+          ? (lang === "fr"
+              ? "Le service IA est temporairement saturé (quota mensuel atteint). Réessaie un peu plus tard."
+              : "The AI service is temporarily over quota. Please try again later.")
+          : t("genericError"),
+      );
       setPhase("plan");
     }
-  }, [detectedItems, ingredients, preferences, planMode, recipeTypes, dietaryConstraints, servingsCount, suggestMenus, isAuthenticated, isAuthLoading, navigate, saveHistory, photoPreview, fetchAndStoreMenuImages]);
+  }, [detectedItems, ingredients, preferences, planMode, recipeTypes, dietaryConstraints, servingsCount, suggestMenus, isAuthenticated, isAuthLoading, navigate, saveHistory, photoPreview, fetchAndStoreMenuImages, t, lang]);
 
   // Submit (text-only, no photo)
   const handleSubmit = useCallback(async () => {
@@ -735,8 +744,17 @@ export function HomePage() {
           setImageSessionId(res.sessionId);
         }).catch(() => {/* images stay as skeleton on error */});
       }
-    } catch (_err) {
-      setError(t("genericError"));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err ?? "");
+      const isQuota =
+        /429|spending cap|quota|rate limit|resource_exhausted/i.test(raw);
+      setError(
+        isQuota
+          ? (lang === "fr"
+              ? "Le service IA est temporairement saturé (quota mensuel atteint). Réessaie un peu plus tard."
+              : "The AI service is temporarily over quota. Please try again later.")
+          : t("genericError"),
+      );
       setPhase("plan");
     }
   }, [
@@ -753,6 +771,7 @@ export function HomePage() {
     saveHistory,
     fetchAndStoreMenuImages,
     t,
+    lang,
   ]);
 
   // Restart
@@ -971,6 +990,7 @@ export function HomePage() {
           planMode={planMode}
           preferences={preferences}
           dietaryConstraints={dietaryConstraints}
+          error={error}
           onPlanModeChange={setPlanMode}
           onPreferencesChange={setPreferences}
           onGenerate={phase === "plan" && detectedItems.length > 0

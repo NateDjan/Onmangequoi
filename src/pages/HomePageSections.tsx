@@ -156,6 +156,7 @@ const CRAVING_OPTIONS_FR = [
 export function PlanSection({
   planMode,
   preferences,
+  error,
   onPlanModeChange,
   onPreferencesChange,
   onGenerate,
@@ -163,12 +164,14 @@ export function PlanSection({
   planMode: PlanMode;
   preferences: string;
   dietaryConstraints: DietaryConstraintKey[];
+  error?: string | null;
   onPlanModeChange: (v: PlanMode) => void;
   onPreferencesChange: (v: string) => void;
   onGenerate: () => void;
 }) {
   const { lang } = useLanguage();
   const [selectedCravings, setSelectedCravings] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const toggleCraving = (label: string) => {
     setSelectedCravings((prev) => {
@@ -179,6 +182,17 @@ export function PlanSection({
       onPreferencesChange(base + cravingStr);
       return next;
     });
+  };
+
+  const handleGenerate = () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      onGenerate();
+    } finally {
+      // Parent switches phase to loading; if it fails and returns here, unlock soon.
+      window.setTimeout(() => setIsGenerating(false), 1200);
+    }
   };
 
   return (
@@ -196,6 +210,12 @@ export function PlanSection({
               : "Tell us how many meals you want to plan"}
           </p>
         </div>
+
+        {error && (
+          <div className="bg-destructive/10 text-destructive rounded-xl px-4 py-3 text-sm font-medium">
+            {error}
+          </div>
+        )}
 
         {/* Plan mode tiles */}
         <div className="grid grid-cols-2 gap-3">
@@ -268,14 +288,17 @@ export function PlanSection({
         {/* Generate button */}
         <Button
           type="button"
-          onClick={onGenerate}
+          onClick={handleGenerate}
+          disabled={isGenerating}
           size="lg"
-          className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
+          className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all disabled:opacity-70"
         >
           <Sparkles className="size-5" />
-          {lang === "fr"
-            ? planMode === "single" ? "✨ Voir les menus" : "✨ Planifier ma semaine"
-            : planMode === "single" ? "✨ See menus" : "✨ Plan my week"
+          {isGenerating
+            ? (lang === "fr" ? "Génération…" : "Generating…")
+            : lang === "fr"
+              ? planMode === "single" ? "✨ Voir les menus" : "✨ Planifier ma semaine"
+              : planMode === "single" ? "✨ See menus" : "✨ Plan my week"
           }
         </Button>
       </div>
