@@ -1008,15 +1008,18 @@ export function HomePage() {
 
       {/* ─── SEO / Editorial content section ─── */}
       {phase === "input" && (
-        <section className="w-full max-w-md lg:max-w-4xl mx-auto px-4 py-10 mt-4 space-y-8 border-t border-border/30">
-          <div className="space-y-3 text-center">
-            <h2 className="text-lg font-bold text-foreground">
-              {lang === "fr" ? "Comment ça marche ?" : "How does it work?"}
+        <section className="w-full max-w-md lg:max-w-4xl mx-auto px-4 py-10 mt-2 space-y-8 border-t border-border/30">
+          <div className="space-y-2 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary italic" style={{ fontFamily: "var(--font-display)" }}>
+              {lang === "fr" ? "Comment ça marche" : "How it works"}
+            </p>
+            <h2 className="text-xl font-semibold text-foreground">
+              {lang === "fr" ? "Ton frigo a la parole" : "Your fridge has the floor"}
             </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto">
               {lang === "fr"
-                ? "On Mange Quoi ? est une application gratuite qui analyse le contenu de ton frigo grâce à l'intelligence artificielle et te propose des recettes personnalisées en quelques secondes. Prends en photo tes ingrédients, ton ticket de caisse ou dis-nous simplement ce que tu as chez toi — l'IA s'occupe du reste."
-                : "On Mange Quoi? is a free app that analyzes your fridge contents with AI and suggests personalized recipes in seconds. Take a photo of your ingredients, your grocery receipt, or just tell us what you have at home — the AI handles the rest."}
+                ? "On Mange Quoi ? analyse le contenu de ton frigo grâce à l'IA et te propose des recettes personnalisées en quelques secondes. Photo, ticket de caisse ou texte — l'IA s'occupe du reste."
+                : "On Mange Quoi? analyzes your fridge with AI and suggests personalized recipes in seconds. Photo, grocery receipt, or text — the AI handles the rest."}
             </p>
           </div>
 
@@ -1024,29 +1027,29 @@ export function HomePage() {
             {[
               {
                 icon: "📸",
-                title: lang === "fr" ? "Prends une photo" : "Take a photo",
+                title: lang === "fr" ? "Photographie ton frigo" : "Photograph your fridge",
                 desc: lang === "fr"
-                  ? "Photo du frigo, du placard ou d'un ticket de caisse — l'IA détecte automatiquement tous les ingrédients présents."
-                  : "Fridge, pantry or grocery receipt — the AI automatically detects all the ingredients.",
+                  ? "Ou tape simplement ce que tu as sous la main — l'IA détecte automatiquement tes ingrédients."
+                  : "Or simply type what you have — the AI automatically detects your ingredients.",
               },
               {
                 icon: "🤖",
-                title: lang === "fr" ? "L'IA génère des recettes" : "AI generates recipes",
+                title: lang === "fr" ? "L'IA compose tes menus" : "AI composes your menus",
                 desc: lang === "fr"
-                  ? "En quelques secondes, tu reçois 3 idées de recettes adaptées à ce que tu as, avec ingrédients, étapes et temps de cuisson."
-                  : "In seconds you receive 3 recipe ideas adapted to what you have, with ingredients, steps and cooking time.",
+                  ? "Des recettes adaptées à tes goûts et contraintes, avec étapes et temps de cuisson."
+                  : "Recipes tailored to your tastes and constraints, with steps and cooking time.",
               },
               {
-                icon: "🍽️",
-                title: lang === "fr" ? "Mange bien, sans gâchis" : "Eat well, no waste",
+                icon: "🍳",
+                title: lang === "fr" ? "Tu cuisines, guidé pas à pas" : "You cook, guided step by step",
                 desc: lang === "fr"
-                  ? "Plus d'ingrédients oubliés au fond du frigo. On Mange Quoi ? t'aide à cuisiner malin et à réduire le gaspillage alimentaire."
-                  : "No more forgotten ingredients at the back of the fridge. On Mange Quoi? helps you cook smart and reduce food waste.",
+                  ? "Instructions claires, quantités ajustées au nombre de convives. Moins de gaspillage."
+                  : "Clear instructions, quantities adjusted to servings. Less waste.",
               },
             ].map(({ icon, title, desc }) => (
-              <div key={title} className="flex gap-4 rounded-2xl bg-muted/40 px-4 py-4">
-                <span className="text-2xl shrink-0 mt-0.5">{icon}</span>
-                <div className="space-y-0.5">
+              <div key={title} className="flex gap-3.5 rounded-2xl bg-muted/50 border border-border/40 px-4 py-4">
+                <span className="size-9 shrink-0 rounded-xl bg-card border border-border/50 flex items-center justify-center text-lg mt-0.5">{icon}</span>
+                <div className="space-y-0.5 min-w-0">
                   <p className="text-sm font-semibold text-foreground">{title}</p>
                   <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
                 </div>
@@ -1056,7 +1059,7 @@ export function HomePage() {
 
           {/* FAQ */}
           <div className="space-y-4">
-            <h3 className="text-base font-bold text-foreground">
+            <h3 className="text-base font-semibold text-foreground">
               {lang === "fr" ? "Questions fréquentes" : "Frequently asked questions"}
             </h3>
             {(lang === "fr" ? [
@@ -1070,14 +1073,14 @@ export function HomePage() {
               { q: "Are my photos stored?", a: "No, photos are analyzed in real time and are not stored on our servers. Only generated recipes can be saved to your history if you have an account." },
               { q: "How do I generate a full week's menu?", a: "Select 'Weekly meal plan' mode from the main interface. The AI generates a complete schedule (lunch + dinner) for 5 or 7 days based on your ingredients." },
             ]).map(({ q, a }) => (
-              <div key={q} className="space-y-1.5">
+              <div key={q} className="space-y-1.5 rounded-xl border border-border/30 bg-card/40 px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{q}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{a}</p>
               </div>
             ))}
           </div>
 
-          <p className="text-center text-xs text-muted-foreground/60 pb-4">
+          <p className="text-center text-xs text-muted-foreground/70 pb-4">
             {lang === "fr"
               ? "Découvrez aussi nos "
               : "Also discover our "}
@@ -1217,10 +1220,13 @@ function InputSection({
   const isDefaultHero = !resolved?.imageUrl;
 
   return (
-    <div className="flex-1 flex flex-col items-center px-4 py-8 md:py-12 animate-fade-in-up">
-      <div className="w-full max-w-md lg:max-w-6xl space-y-5 lg:space-y-0 lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:items-start">
-        {/* Hero — food photo with gradient overlay (left column on desktop) */}
-        <div className="relative rounded-3xl overflow-hidden mb-1 lg:mb-0 h-[220px] lg:h-[430px]" style={{backgroundColor: '#1a0f0a'}}>
+    <div className="flex-1 flex flex-col items-center px-4 py-6 md:py-10 animate-fade-in-up">
+      <div className="w-full max-w-md lg:max-w-6xl space-y-0 lg:grid lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:items-start">
+        {/* Hero — food photo with soft overlay + cream badge (maquette 1) */}
+        <div
+          className="relative rounded-[1.75rem] overflow-hidden h-[230px] lg:h-[430px] shadow-[0_12px_32px_-12px_rgba(45,35,24,0.28)]"
+          style={{ backgroundColor: "#1a0f0a" }}
+        >
           {isDefaultHero ? (
             /* Default hero — self-hosted WebP, already preloaded by <link rel=preload> */
             <picture>
@@ -1237,7 +1243,7 @@ function InputSection({
                 fetchPriority="high"
                 decoding="async"
                 className="w-full h-full object-cover"
-                style={{objectPosition: 'center 40%'}}
+                style={{ objectPosition: "center 40%" }}
               />
             </picture>
           ) : (
@@ -1248,34 +1254,37 @@ function InputSection({
               fetchPriority="high"
               decoding="async"
               className="w-full h-full object-cover"
-              style={{objectPosition: 'center 40%'}}
+              style={{ objectPosition: "center 40%" }}
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/80" />
-          {/* Daily dish name badge — top right */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/75" />
+          {/* Daily dish badge — cream pill (Éditorial Lumière) */}
           {heroDishName && (
-            <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1">
-              <span className="text-[10px] font-semibold text-white/70 uppercase tracking-wide">
+            <div className="absolute top-3 right-3 rounded-full px-3 py-1.5 flex items-center gap-1 bg-[#fdf9f3]/95 backdrop-blur-sm shadow-sm border border-white/40">
+              <span className="text-[10px] font-semibold text-primary uppercase tracking-[0.04em]">
                 Menu du jour{heroPillar ? ` · ${heroPillar.emoji} ${lang === "fr" ? heroPillar.fr : heroPillar.en}` : ""}
               </span>
             </div>
           )}
-          <div className="absolute bottom-0 inset-x-0 p-5 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#fdf9f3] drop-shadow-lg">
+          {/* Caption raised so dish name stays above the overlapping form card on mobile */}
+          <div className="absolute bottom-0 inset-x-0 px-5 pt-5 pb-8 lg:pb-6 text-center">
+            <h1 className="text-[1.9rem] md:text-4xl font-semibold tracking-tight text-[#fdf9f3] drop-shadow-lg">
               {t("appName")}
             </h1>
             {heroDishName ? (
-              <p className="text-white/90 text-sm mt-1 drop-shadow font-medium italic">✨ {heroDishName}</p>
+              <p className="text-white/95 text-sm mt-1.5 drop-shadow font-medium italic" style={{ fontFamily: "var(--font-display)" }}>
+                ✨ {heroDishName}
+              </p>
             ) : (
-              <p className="text-white/80 text-sm mt-1 drop-shadow">
+              <p className="text-white/85 text-sm mt-1.5 drop-shadow">
                 {lang === "fr" ? "Photo du frigo, ticket de caisse ou dis-moi tes ingrédients" : "Fridge photo, grocery receipt, or tell me your ingredients"}
               </p>
             )}
           </div>
         </div>
 
-        {/* Right column on desktop — all input controls (stacked below hero on mobile) */}
-        <div className="space-y-5 lg:pt-1">
+        {/* Form card — overlaps hero on mobile, side-by-side on desktop */}
+        <div className="relative z-10 -mt-6 lg:mt-0 space-y-5 rounded-[1.5rem] border border-border/60 bg-card p-4 sm:p-5 shadow-[0_8px_30px_-14px_rgba(45,35,24,0.18)] lg:shadow-none lg:border-0 lg:bg-transparent lg:p-0 lg:pt-1">
 
         {/* ── Multi-photo grid ── */}
         {photos.length > 0 && (
@@ -1319,7 +1328,7 @@ function InputSection({
             type="button"
             onClick={onAnalyzePhoto}
             size="lg"
-            className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/35 transition-all"
+            className="w-full h-14 text-lg font-bold rounded-2xl gap-2 shadow-[0_10px_24px_-8px_rgba(193,80,46,0.45)] hover:shadow-[0_14px_28px_-8px_rgba(193,80,46,0.55)] transition-all"
           >
             <ScanSearch className="size-5" />
             {lang === "fr" ? `Analyser mes photos (${photos.length > 0 ? photos.length : 1})` : `Analyze my photos (${photos.length > 0 ? photos.length : 1})`}
@@ -1351,11 +1360,11 @@ function InputSection({
             onChange={onIngredientsChange}
             placeholder={t("inputPlaceholder")}
             rows={3}
-            className="w-full rounded-xl border border-surface-border bg-card px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 resize-none transition"
+            className="w-full rounded-[14px] border border-surface-border-strong bg-background/60 px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 resize-none transition"
           />
 
           {/* ── Compact icon toolbar ── */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 mt-1">
             <input
               ref={fileInputRef}
               type="file"
@@ -1368,7 +1377,7 @@ function InputSection({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="size-10 rounded-xl border border-surface-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-hover transition"
+              className="size-10 rounded-xl border border-surface-border-strong bg-background/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-hover transition"
               title={lang === "fr" ? "Photo / Ticket" : "Photo / Receipt"}
             >
               <Camera className="size-[18px]" />
@@ -1382,7 +1391,7 @@ function InputSection({
                 className={`size-10 rounded-xl border flex items-center justify-center transition ${
                   isListening
                     ? "bg-primary border-primary text-primary-foreground shadow-lg"
-                    : "border-surface-border bg-card text-muted-foreground hover:text-foreground hover:bg-surface-hover"
+                    : "border-surface-border-strong bg-background/60 text-muted-foreground hover:text-foreground hover:bg-surface-hover"
                 }`}
                 title={isListening ? t("stopDictation") : t("dictate")}
               >
@@ -1404,7 +1413,7 @@ function InputSection({
                 className={`h-10 rounded-xl border flex items-center gap-1.5 px-2.5 transition ${
                   servingsOpen
                     ? "border-primary/60 bg-primary/10 text-primary"
-                    : "border-surface-border bg-card text-muted-foreground hover:text-foreground hover:bg-surface-hover"
+                    : "border-surface-border-strong bg-background/60 text-muted-foreground hover:text-foreground hover:bg-surface-hover"
                 }`}
                 title={lang === "fr" ? "Nombre de personnes" : "Servings"}
               >
@@ -1452,7 +1461,7 @@ function InputSection({
                     ? "border-primary/60 bg-primary/10 text-primary"
                     : dietaryConstraints.length > 0
                       ? "border-primary/40 bg-primary/5 text-primary"
-                      : "border-surface-border bg-card text-muted-foreground hover:text-foreground hover:bg-surface-hover"
+                      : "border-surface-border-strong bg-background/60 text-muted-foreground hover:text-foreground hover:bg-surface-hover"
                 }`}
                 title={t("dietaryConstraints_title")}
               >
@@ -1550,10 +1559,10 @@ function InputSection({
                     key={key}
                     type="button"
                     onClick={() => onToggleRecipeType(key)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-left border transition-all ${
+                    className={`flex items-center gap-2 rounded-[14px] px-3 py-2.5 text-left border transition-all ${
                       isSelected
                         ? cfg.color
-                        : "border-surface-border bg-card text-muted-foreground hover:bg-surface-hover"
+                        : "border-surface-border bg-background/50 text-muted-foreground hover:bg-surface-hover"
                     }`}
                   >
                     <span className="text-xl shrink-0">{cfg.emoji}</span>
@@ -1587,7 +1596,7 @@ function InputSection({
             value={preferences}
             onChange={(e) => onPreferencesChange(e.target.value)}
             placeholder={lang === "fr" ? "Cuisine italienne, soupe rapide, comfort food…" : "Italian, quick soup, comfort food…"}
-            className="w-full rounded-xl border border-surface-border bg-card px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition"
+            className="w-full rounded-[14px] border border-surface-border-strong bg-background/60 px-4 py-3 text-base placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition"
           />
           {preferences.trim() && (
             <p className="text-[11px] text-primary/70 flex items-center gap-1">
@@ -1611,7 +1620,7 @@ function InputSection({
             onClick={onSubmit}
             disabled={!ingredients.trim() || isAuthLoading}
             size="lg"
-            className="w-full h-14 text-lg font-bold rounded-xl gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all disabled:opacity-40 disabled:shadow-none"
+            className="w-full h-14 text-[16.5px] font-bold rounded-2xl gap-2 shadow-[0_10px_24px_-8px_rgba(193,80,46,0.5)] hover:shadow-[0_14px_28px_-8px_rgba(193,80,46,0.55)] transition-all disabled:opacity-40 disabled:shadow-none"
           >
             <ChefHat className="size-5" />
             {planMode === "single" ? t("suggestMenus") : t("planMyWeek")}
