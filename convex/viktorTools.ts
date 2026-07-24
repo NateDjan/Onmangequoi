@@ -158,18 +158,165 @@ function makeRecipeSchema(prefix: string) {
     [`${prefix}_servings`]: { type: "integer", description: "Nombre de portions" },
     [`${prefix}_ingredients`]: { type: "array", items: { type: "string" }, description: "Liste des ingrédients avec quantités" },
     [`${prefix}_steps`]: { type: "array", items: { type: "string" }, description: "Étapes de préparation" },
-    [`${prefix}_imagePrompt`]: { type: "string", description: "Detailed English prompt for generating a professional food photography image of the finished dish. MUST include: served on a large wide-rimmed white porcelain plate (assiette creuse à large rebord), entire plate fully visible in frame, wide shot, camera pulled far back, fine dining presentation. NEVER crop the plate, NEVER use extreme close-ups, NEVER use small bowls or tiny plates." },
+    [`${prefix}_imagePrompt`]: {
+      type: "string",
+      description:
+        "English food-photo prompt. MUST name the real carb/protein of THIS recipe (e.g. cooked rice grains if rice, pasta shapes if pasta). List the visible ingredients. FORBID wrong starches (no pasta if recipe is rice). Plate: large wide-rimmed white porcelain plate, entire plate visible, wide shot, 45° elevated, never close-up, never small bowl.",
+    },
     [`${prefix}_extras`]: { type: "array", items: { type: "string" }, description: "1-2 ingrédients supplémentaires optionnels qui amélioreraient le plat (ex: 'Parmesan pour garnir', 'Citron pour le jus'). Vide si le plat est déjà complet." },
     [`${prefix}_calories`]: { type: "integer", description: "Estimation des calories par portion (kcal). Donne un chiffre réaliste basé sur les ingrédients." },
   };
 }
 
-// Enforce plate style & camera angle on every imagePrompt (safety net)
-const PLATE_STYLE_SUFFIX = ", served on a large wide-rimmed white porcelain deep plate (assiette creuse à large rebord), entire plate fully visible in frame, wide shot showing the whole dish, camera pulled back far enough to see the complete plate with generous empty space around it, 45-degree elevated angle, fine dining presentation, never extreme close-up, never cropped plate, never small bowl or tiny plate";
-function enforceImagePromptStyle(prompt: string): string {
+// Enforce plate style, camera angle AND ingredient fidelity on every imagePrompt
+const PLATE_STYLE_SUFFIX =
+  ", served on a large wide-rimmed white porcelain deep plate (assiette creuse à large rebord), entire plate fully visible in frame, wide shot showing the whole dish, camera pulled back far enough to see the complete plate with generous empty space around it, 45-degree elevated angle, fine dining presentation, never extreme close-up, never cropped plate, never small bowl or tiny plate";
+
+/** Normalize/clean ingredient tokens for prompt injection */
+function cleanIngredientLabel(raw: string): string {
+  return raw
+    .replace(/^\s*[-•*]+\s*/, "")
+    .replace(/^\d+[.,]?\d*\s*(g|kg|ml|cl|l|mg|c\.?à\.?[sc]\.?|cs|cc|tasse|cups?|tbsp|tsp|oz|lb)?\s*/i, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Detect main starch / protein markers so we can forbid substitutions
+ * that flux tends to invent (pasta instead of rice, noodles instead of grains, etc.).
+ */
+function ingredientFidelityDirectives(dishName: string, ingredients: string[]): {
+  mustShow: string[];
+  forbid: string[];
+} {
+  const blob = `${dishName} ${ingredients.join(" ")}`.toLowerCase();
+  const mustShow: string[] = [];
+  const forbid: string[] = [];
+
+  const has = (...words: string[]) => words.some((w) => blob.includes(w));
+
+  // Starches — mutually exclusive when only one is present
+  const hasRice = has("riz", "rice", "risotto", "basmati", "thaï", "thai");
+  const hasPasta = has("pâte", "pate", "pasta", "spaghetti", "tagliatelle", "penne", "nouille", "noodle", "linguine", "fusilli", "macaroni");
+  const hasPotato = has("pomme de terre", "patate", "potato", "frite", "purée");
+  const hasQuinoa = has("quinoa");
+  const hasCouscous = has("couscous", "boulgour", "bulgur", "semoule");
+  const hasBread = has("pain", "bread", "toast", "bagel");
+
+  if (hasRice && !hasPasta) {
+    mustShow.push("clearly visible cooked rice grains (not pasta, not noodles)");
+    forbid.push(
+      "pasta",
+      "spaghetti",
+      "noodles",
+      "tagliatelle",
+      "penne",
+      "fusilli",
+      "macaroni",
+      "ramen",
+      "udon",
+      "vermicelli",
+    );
+  }
+  if (hasPasta && !hasRice) {
+    mustShow.push("clearly visible pasta shapes matching the recipe");
+    forbid.push("rice", "risotto", "rice grains");
+  }
+  if (hasPotato) mustShow.push("potato pieces or fried potato as described");
+  if (hasQuinoa) {
+    mustShow.push("quinoa grains");
+    if (!hasPasta) forbid.push("pasta", "noodles");
+    if (!hasRice) forbid.push("rice");
+  }
+  if (hasCouscous) {
+    mustShow.push("couscous / fine wheat grains");
+    if (!hasPasta) forbid.push("long pasta", "spaghetti");
+  }
+  if (hasBread && !hasPasta && !hasRice) mustShow.push("bread as plated");
+
+  // Proteins
+  if (has("poulet", "chicken")) mustShow.push("chicken pieces");
+  if (has("saumon", "salmon")) mustShow.push("salmon fillet");
+  if (has("boeuf", "bœuf", "beef", "steak")) mustShow.push("beef");
+  if (has("porc", "pork", "jambon", "lardon")) mustShow.push("pork / ham as specified");
+  if (has("canard", "duck", "magret")) mustShow.push("duck / magret");
+  if (has("crevette", "shrimp", "gambas")) mustShow.push("shrimp");
+  if (has("thon", "tuna")) mustShow.push("tuna");
+  if (has("tofu")) mustShow.push("tofu");
+  if (has("œuf", "oeuf", "egg", "omelette")) mustShow.push("egg");
+  if (has("feta")) mustShow.push("feta cheese cubes/crumbs");
+  if (has("fromage", "cheese", "parmesan", "mozza", "emmental", "chèvre", "chevre") && !has("feta")) {
+    mustShow.push("cheese as specified");
+  }
+
+  // Veg frequent mismatches
+  if (has("courgette", "zucchini")) mustShow.push("zucchini / courgette");
+  if (has("tomate", "tomato")) mustShow.push("tomato");
+  if (has("épinard", "epinard", "spinach")) mustShow.push("spinach");
+  if (has("brocoli", "broccoli")) mustShow.push("broccoli florets");
+  if (has("menthe", "mint")) mustShow.push("fresh mint leaves");
+  if (has("citron", "lemon")) mustShow.push("lemon");
+  if (has("avocat", "avocado")) mustShow.push("avocado");
+
+  // De-dupe
+  return {
+    mustShow: [...new Set(mustShow)],
+    forbid: [...new Set(forbid)],
+  };
+}
+
+/**
+ * Build a strict image prompt that forces ingredient fidelity for fal/flux.
+ * Always rewrites the prompt around dish name + ingredients (LLM imagePrompt is only a hint).
+ */
+function buildStrictFoodImagePrompt(
+  dishName: string,
+  ingredients: string[],
+  llmHint?: string,
+): string {
+  const cleaned = ingredients.map(cleanIngredientLabel).filter((s) => s.length > 1).slice(0, 12);
+  const { mustShow, forbid } = ingredientFidelityDirectives(dishName, cleaned);
+  const ingredientList =
+    cleaned.length > 0 ? cleaned.join(", ") : "only the ingredients implied by the dish name";
+
+  const hint = (llmHint || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 280);
+
+  const must = mustShow.length
+    ? `MUST visibly include: ${mustShow.join("; ")}.`
+    : "MUST visually match the named dish and listed ingredients.";
+  const no = forbid.length
+    ? `STRICTLY FORBIDDEN on the plate (do NOT render): ${forbid.join(", ")}.`
+    : "Do not add unrelated starches or proteins not in the recipe.";
+
+  return [
+    `Professional food photography of "${dishName}".`,
+    `Authentic plated meal whose REAL ingredients are exactly: ${ingredientList}.`,
+    must,
+    no,
+    "Do not substitute the main carb or protein. If the recipe is rice-based, show RICE grains only — never pasta or noodles. If pasta-based, show pasta — never rice.",
+    hint ? `Plating cue: ${hint}.` : "",
+    "Photorealistic, appetizing, restaurant quality, soft natural lighting, shallow depth of field, editorial food magazine style",
+    PLATE_STYLE_SUFFIX.replace(/^,\s*/, ""),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function enforceImagePromptStyle(
+  prompt: string,
+  dishName?: string,
+  ingredients?: string[],
+): string {
+  if (dishName) {
+    return buildStrictFoodImagePrompt(dishName, ingredients ?? [], prompt);
+  }
   const lower = prompt.toLowerCase();
   if (lower.includes("wide-rimmed") && lower.includes("entire plate")) return prompt;
-  // Strip any existing style suffix before re-adding the updated one
   const stripped = prompt
     .replace(/, served on a large wide-rimmed.*$/i, "")
     .replace(/, (photographed|shot) at a 45.*$/i, "");
@@ -187,19 +334,21 @@ function extractRecipe(data: Record<string, unknown>, prefix: string, fallbackTy
   } else if (rawType.includes("gourm") || rawType.includes("indulg") || rawType.includes("riche")) {
     type = "gourmande";
   }
+  const name = String(data[`${prefix}_name`] || "Plat du chef");
+  const ingredients = Array.isArray(data[`${prefix}_ingredients`])
+    ? (data[`${prefix}_ingredients`] as string[]).map(String)
+    : [];
+  const llmImagePrompt = String(data[`${prefix}_imagePrompt`] || "");
   return {
-    name: String(data[`${prefix}_name`] || "Plat du chef"),
+    name,
     type,
     description: String(data[`${prefix}_description`] || "Un délicieux plat à découvrir !"),
     cookingTime: String(data[`${prefix}_time`] || "30 min"),
     difficulty: String(data[`${prefix}_difficulty`] || "Moyen"),
     servings: typeof data[`${prefix}_servings`] === "number" ? (data[`${prefix}_servings`] as number) : 4,
-    ingredients: Array.isArray(data[`${prefix}_ingredients`]) ? (data[`${prefix}_ingredients`] as string[]).map(String) : [],
+    ingredients,
     steps: Array.isArray(data[`${prefix}_steps`]) ? (data[`${prefix}_steps`] as string[]).map(String) : [],
-    imagePrompt: enforceImagePromptStyle(String(
-      data[`${prefix}_imagePrompt`] ||
-        `Professional food photography of ${data[`${prefix}_name`] || "a delicious dish"}, entire plate fully visible in frame, wide shot with camera pulled far back, large wide-rimmed white porcelain plate, fine dining presentation, elegant plating, 45-degree elevated angle, natural soft lighting, editorial food magazine style`,
-    )),
+    imagePrompt: enforceImagePromptStyle(llmImagePrompt, name, ingredients),
     extras: Array.isArray(data[`${prefix}_extras`]) ? (data[`${prefix}_extras`] as string[]).map(String) : [],
     calories: typeof data[`${prefix}_calories`] === "number" ? (data[`${prefix}_calories`] as number) : undefined,
   };
@@ -236,7 +385,11 @@ function makeWeeklySchema(slots: string[]) {
     props[`${p}_servings`] = { type: "integer", description: "Nombre de portions" };
     props[`${p}_ingredients`] = { type: "array", items: { type: "string" }, description: "Ingrédients avec quantités" };
     props[`${p}_steps`] = { type: "array", items: { type: "string" }, description: "Étapes de préparation" };
-    props[`${p}_imagePrompt`] = { type: "string", description: "Detailed English prompt for professional food photography. MUST include: served on a large wide-rimmed white porcelain plate (assiette creuse à large rebord), entire plate fully visible in frame, wide shot with camera pulled far back, fine dining presentation. NEVER crop the plate, NEVER use extreme close-ups, NEVER use small bowls or tiny plates." };
+    props[`${p}_imagePrompt`] = {
+      type: "string",
+      description:
+        "English food-photo prompt naming the REAL ingredients of this meal (rice if rice, pasta if pasta — never swap). Large wide-rimmed white porcelain plate, entire plate visible, wide shot, never close-up.",
+    };
     props[`${p}_calories`] = { type: "integer", description: "Estimation calories par portion (kcal)" };
   }
   return props;
@@ -244,16 +397,21 @@ function makeWeeklySchema(slots: string[]) {
 
 function extractWeeklyRecipe(data: Record<string, unknown>, slot: string): Menu {
   const p = `slot_${slot}`;
+  const name = String(data[`${p}_name`] || "Plat du chef");
+  const ingredients = Array.isArray(data[`${p}_ingredients`])
+    ? (data[`${p}_ingredients`] as string[]).map(String)
+    : [];
+  const llmImagePrompt = String(data[`${p}_imagePrompt`] || "");
   return {
-    name: String(data[`${p}_name`] || "Plat du chef"),
+    name,
     type: "classique",
     description: String(data[`${p}_description`] || ""),
     cookingTime: String(data[`${p}_time`] || "30 min"),
     difficulty: String(data[`${p}_difficulty`] || "Facile"),
     servings: typeof data[`${p}_servings`] === "number" ? (data[`${p}_servings`] as number) : 4,
-    ingredients: Array.isArray(data[`${p}_ingredients`]) ? (data[`${p}_ingredients`] as string[]).map(String) : [],
+    ingredients,
     steps: Array.isArray(data[`${p}_steps`]) ? (data[`${p}_steps`] as string[]).map(String) : [],
-    imagePrompt: enforceImagePromptStyle(String(data[`${p}_imagePrompt`] || `Professional food photography of ${data[`${p}_name`] || "a delicious dish"}, entire plate fully visible in frame, wide shot with camera pulled far back, large wide-rimmed white porcelain plate, fine dining presentation, 45-degree elevated angle, never close-up, never cropped`)),
+    imagePrompt: enforceImagePromptStyle(llmImagePrompt, name, ingredients),
     extras: [],
     calories: typeof data[`${p}_calories`] === "number" ? (data[`${p}_calories`] as number) : undefined,
   };
@@ -345,7 +503,7 @@ export const suggestMenus = action({
     if (planMode === "single") {
       // ── If user has a specific request ("envie particulière"), generate ONLY that one recipe ──
       if (preferences && preferences.trim().length > 0) {
-        const prompt = `Tu es un chef cuisinier. Propose UNE SEULE recette en utilisant STRICTEMENT les ingrédients fournis, en respectant l'envie spécifique de l'utilisateur.\n\nRÈGLES ABSOLUES SUR LES INGRÉDIENTS :\n- Utilise UNIQUEMENT les ingrédients listés par l'utilisateur + sel, poivre et eau (considérés toujours disponibles).\n- N'ajoute AUCUN autre ingrédient non mentionné.\n- Si la liste est limitée, adapte la recette : fais simple mais bon.\n- La recette doit coller le plus possible à l'envie exprimée.\n\nFournis pour recipe1 : name, type, description, time, difficulty, servings, ingredients, steps, imagePrompt, extras, calories\n\nRÈGLE PHOTO (imagePrompt) : Le prompt image DOIT montrer le plat servi dans une grande assiette creuse à large rebord en porcelaine blanche, style gastronomique (wide-rimmed white porcelain plate). Photo prise en légère contre-plongée avec un peu de hauteur, ou en biais depuis une distance élégante (45° angle, slightly elevated, shot from a distance). JAMAIS de petit bol ni de petite assiette. JAMAIS de gros plan serré.`;
+        const prompt = `Tu es un chef cuisinier. Propose UNE SEULE recette en utilisant STRICTEMENT les ingrédients fournis, en respectant l'envie spécifique de l'utilisateur.\n\nRÈGLES ABSOLUES SUR LES INGRÉDIENTS :\n- Utilise UNIQUEMENT les ingrédients listés par l'utilisateur + sel, poivre et eau (considérés toujours disponibles).\n- N'ajoute AUCUN autre ingrédient non mentionné.\n- Si la liste est limitée, adapte la recette : fais simple mais bon.\n- La recette doit coller le plus possible à l'envie exprimée.\n\nFournis pour recipe1 : name, type, description, time, difficulty, servings, ingredients, steps, imagePrompt, extras, calories\n\nRÈGLE PHOTO (imagePrompt) : en anglais. Doit lister les vrais ingrédients du plat (ex: cooked rice grains si riz — JAMAIS de pasta/noodles à la place). Interdiction de substituer la féculente ou la protéine principale. Grande assiette creuse porcelaine blanche large rebord, assiette entière visible, plan large 45°, jamais gros plan / petit bol.`;
 
         const outputSchema = {
           type: "object" as const,
@@ -391,7 +549,11 @@ export const suggestMenus = action({
                 servings: chef.servings,
                 ingredients: chef.ingredients,
                 steps: chef.steps,
-                imagePrompt: chef.imagePrompt,
+                imagePrompt: buildStrictFoodImagePrompt(
+                  chef.name,
+                  Array.isArray(chef.ingredients) ? chef.ingredients.map(String) : [],
+                  chef.imagePrompt,
+                ),
                 extras: [] as string[],
                 calories: chef.calories,
                 slot: undefined,
@@ -427,7 +589,7 @@ export const suggestMenus = action({
       const recipeCount = recipeEntries.length;
       const recipeKeys = recipeEntries.map((r) => r.key).join(", ");
 
-      const prompt = `Tu es un chef cuisinier. Propose exactement ${recipeCount} recette${recipeCount > 1 ? "s" : ""} en utilisant STRICTEMENT les ingrédients fournis par l'utilisateur.\n\nRÈGLE SUR LES TYPES — OBLIGATOIRE :\n${typeRules}\n\nRÈGLES SUR LES RECETTES :\n- Propose des recettes CLASSIQUES et TRADITIONNELLES en priorité (plats familiaux du quotidien, cuisine française ou internationale bien connue). Évite les recettes trop originales ou exotiques sauf si l'utilisateur le demande.\n- Chaque recette doit avoir un nom reconnaissable (Poulet rôti, Pâtes carbonara, Salade niçoise…).\n\nRÈGLES ABSOLUES SUR LES INGRÉDIENTS :\n- Utilise UNIQUEMENT les ingrédients listés par l'utilisateur + sel, poivre et eau (considérés toujours disponibles).\n- N'ajoute AUCUN autre ingrédient non mentionné.\n- Dans "ingredients", liste UNIQUEMENT des ingrédients qui viennent de la liste fournie (+ sel/poivre/eau).\n- Si la liste est limitée, adapte les recettes : fais simple mais bon.\n\nPour chaque recette (${recipeKeys}), fournis :\n- name, type, description, time, difficulty, servings, ingredients, steps, imagePrompt, extras, calories\n\nRÈGLE PHOTO (imagePrompt) : Le prompt image DOIT montrer le plat servi dans une grande assiette creuse à large rebord en porcelaine blanche, style gastronomique (wide-rimmed white porcelain plate). Photo prise en légère contre-plongée avec un peu de hauteur, ou en biais depuis une distance élégante (45° angle, slightly elevated, shot from a distance). JAMAIS de petit bol ni de petite assiette. JAMAIS de gros plan serré.`;
+      const prompt = `Tu es un chef cuisinier. Propose exactement ${recipeCount} recette${recipeCount > 1 ? "s" : ""} en utilisant STRICTEMENT les ingrédients fournis par l'utilisateur.\n\nRÈGLE SUR LES TYPES — OBLIGATOIRE :\n${typeRules}\n\nRÈGLES SUR LES RECETTES :\n- Propose des recettes CLASSIQUES et TRADITIONNELLES en priorité (plats familiaux du quotidien, cuisine française ou internationale bien connue). Évite les recettes trop originales ou exotiques sauf si l'utilisateur le demande.\n- Chaque recette doit avoir un nom reconnaissable (Poulet rôti, Pâtes carbonara, Salade niçoise…).\n\nRÈGLES ABSOLUES SUR LES INGRÉDIENTS :\n- Utilise UNIQUEMENT les ingrédients listés par l'utilisateur + sel, poivre et eau (considérés toujours disponibles).\n- N'ajoute AUCUN autre ingrédient non mentionné.\n- Dans "ingredients", liste UNIQUEMENT des ingrédients qui viennent de la liste fournie (+ sel/poivre/eau).\n- Si la liste est limitée, adapte les recettes : fais simple mais bon.\n\nPour chaque recette (${recipeKeys}), fournis :\n- name, type, description, time, difficulty, servings, ingredients, steps, imagePrompt, extras, calories\n\nRÈGLE PHOTO (imagePrompt) : en anglais. Doit lister les vrais ingrédients du plat (ex: cooked rice grains si riz — JAMAIS de pasta/noodles à la place). Interdiction de substituer la féculente ou la protéine principale. Grande assiette creuse porcelaine blanche large rebord, assiette entière visible, plan large 45°, jamais gros plan / petit bol.`;
 
       const outputSchema = {
         type: "object" as const,
@@ -484,7 +646,11 @@ export const suggestMenus = action({
               servings: chef.servings,
               ingredients: chef.ingredients,
               steps: chef.steps,
-              imagePrompt: chef.imagePrompt,
+              imagePrompt: buildStrictFoodImagePrompt(
+                  chef.name,
+                  Array.isArray(chef.ingredients) ? chef.ingredients.map(String) : [],
+                  chef.imagePrompt,
+                ),
               extras: [] as string[],
               calories: chef.calories,
               slot: undefined,
@@ -552,7 +718,7 @@ Pour chaque créneau (ex: slot_lun_soir), fournis :
 - servings : nombre de portions (entier)
 - ingredients : liste des ingrédients avec quantités
 - steps : étapes de préparation claires
-- imagePrompt : prompt détaillé en anglais pour photo food professionnelle. OBLIGATOIRE : le plat doit être servi dans une grande assiette creuse à large rebord en porcelaine blanche (wide-rimmed plate), style gastronomique, présentation élégante. Photo en biais à 45° depuis une légère distance, perspective légèrement surélevée. JAMAIS de petit bol ni de petite assiette. JAMAIS de gros plan serré
+- imagePrompt : en anglais, noms des VRAIS ingrédients (cooked rice grains si riz — JAMAIS pasta/noodles). Interdiction de substituer féculente/protéine. Grande assiette creuse porcelaine blanche large rebord, plan large 45°, jamais gros plan / petit bol
 - calories : estimation réaliste des calories par portion (kcal)`;
 
     const outputSchema = {
@@ -996,8 +1162,15 @@ async function processPendingImageJobs(ctx: {
   let succeeded = 0;
   let failed = 0;
 
-  const buildPrompt = (dishName: string, imagePrompt: string) =>
-    `Professional food photography, ${dishName}, ${imagePrompt}, beautifully plated, appetizing, restaurant quality, soft natural lighting, shallow depth of field, delicious looking`;
+  const buildPrompt = (dishName: string, imagePrompt: string) => {
+    // imagePrompt is already rewritten with strict ingredient fidelity in extractRecipe.
+    // Prefacing with dish name again helps flux anchor the subject.
+    const base = (imagePrompt || "").trim();
+    if (base.length > 40) {
+      return base;
+    }
+    return buildStrictFoodImagePrompt(dishName || "plated meal", [], base);
+  };
 
   const FAL_IMAGE_MODEL = "fal-ai/flux/schnell";
 
